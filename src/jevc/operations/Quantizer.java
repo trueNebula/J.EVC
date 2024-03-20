@@ -29,29 +29,29 @@ public class Quantizer {
     public Quantizer() { }
 
     public Quantizer(int qualityFactor) {
-        /*int val;
-        double S = 0;
-        if (qualityFactor < 50) S = 5000 / qualityFactor;
-        else S = 200 - 2 * qualityFactor;
-        if (qualityFactor < 1 || qualityFactor >= 100) {
-            System.err.println("The quality factor specified is out of the [1..100) range.");
-        } else {
-            for (int i = 0; i < 64; i++) {
-                // compute the luminance coefficients
-                val = (int) (QUANTUM_LUMINANCE[i] * S + 50) / 100;
-                val = (1 > val) ? 1 : val;
-                QUANTUM_LUMINANCE[i] = 255 < val ? 255 : val;
-
-                // compute the chrominance coefficients
-                val = (int) (QUANTUM_CHROMINANCE[i] * S + 50) / 100;
-                val = (1 > val) ? 1 : val;
-                QUANTUM_CHROMINANCE[i] = 255 < val ? 255 : val;
-            }
-        }*/
+//        int val;
+//        double S = 0;
+//        if (qualityFactor < 50) S = (double) 5000 / qualityFactor;
+//        else S = 200 - 2 * qualityFactor;
+//        if (qualityFactor < 1 || qualityFactor >= 100) {
+//            System.err.println("The quality factor specified is out of the [1..100) range.");
+//        } else {
+//            for (int i = 0; i < 64; i++) {
+//                // compute the luminance coefficients
+//                val = (int) (QUANTUM_LUMINANCE[i] * S + 50) / 100;
+//                val = Math.max(1, val);
+//                QUANTUM_LUMINANCE[i] = Math.min(255, val);
+//
+//                // compute the chrominance coefficients
+//                val = (int) (QUANTUM_CHROMINANCE[i] * S + 50) / 100;
+//                val = Math.max(1, val);
+//                QUANTUM_CHROMINANCE[i] = Math.min(255, val);
+//            }
+//        }
     }
 
     public void quantize(Block block) {
-        int blockdata[][] = block.getData();
+        int[][] blockdata = block.getData();
         if (block.getType()=='Y') {
             for (int i = 0; i < Block.BLOCKSIZE; i++) {
                 for (int j = 0; j < Block.BLOCKSIZE; j++) {
@@ -70,7 +70,7 @@ public class Quantizer {
     }
 
     public void dequantize(Block block) {
-        int blockdata[][] = block.getData();
+        int[][] blockdata = block.getData();
         if (block.getType()=='Y') {
             for (int i = 0; i < Block.BLOCKSIZE; i++) {
                 for (int j = 0; j < Block.BLOCKSIZE; j++) {

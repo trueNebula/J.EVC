@@ -7,7 +7,7 @@ import jevc.entities.RunLengthBlock;
 import java.util.ArrayList;
 
 public class RunLengthEncoder {
-    private int lastDCvalues[] = {0, 0, 0}; // [0] - last Y value; [1] - last Cb value; [2] - last Cr value
+    private final int[] lastDCvalues = {0, 0, 0}; // [0] - last Y value; [1] - last Cb value; [2] - last Cr value
     public static final int[] ZIGZAG_ORDER = {
             0,  1,  8,  16,  9,  2,  3, 10,
             17, 24, 32, 25, 18, 11,  4,  5,
@@ -19,17 +19,14 @@ public class RunLengthEncoder {
             53, 60, 61, 54, 47, 55, 62, 63};
 
     public RunLengthBlock encode(Block block) {
-        int blockdata[][] = block.getData();
-        int type = -1;
-        switch (block.getType()) {
-            case 'Y':
-                type = 0; break;
-            case 'U':
-                type = 1; break;
-            case 'V':
-                type = 2; break;
-        }
-        ArrayList<RunLength> runlengthElements = new ArrayList<RunLength>();
+        int[][] blockdata = block.getData();
+        int type = switch (block.getType()) {
+            case 'Y' -> 0;
+            case 'U' -> 1;
+            case 'V' -> 2;
+            default -> -1;
+        };
+        ArrayList<RunLength> runlengthElements = new ArrayList<>();
 
         // encode the DC coefficient
         int amplitude = blockdata[0][0]-lastDCvalues[type];
@@ -90,15 +87,12 @@ public class RunLengthEncoder {
         System.out.println("RunLengthEncoder::decode() Processing RunLengthBlock with size " +
                 rleBlock.getSize());
 
-        int type = -1;
-        switch (rleBlock.getType()) {
-            case 'Y':
-                type = 0; break;
-            case 'U':
-                type = 1; break;
-            case 'V':
-                type = 2; break;
-        }
+        int type = switch (rleBlock.getType()) {
+            case 'Y' -> 0;
+            case 'U' -> 1;
+            case 'V' -> 2;
+            default -> -1;
+        };
         data[0][0] = runLength.getAmplitude() + lastDCvalues[type];
         lastDCvalues[type] = data[0][0];
         rleBlock.getData().remove(0);
@@ -124,7 +118,6 @@ public class RunLengthEncoder {
             i++;
         }
 
-        Block block = new Block(data, rleBlock.getType());
-        return block;
+        return new Block(data, rleBlock.getType());
     }
 }

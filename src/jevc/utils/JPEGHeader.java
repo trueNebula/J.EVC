@@ -1,7 +1,7 @@
 package jevc.utils;
 
 
-/**
+/*
  * File JPGInfoDump.java
  * JPGInfoDump class dumps on the screen the header+compressed data of a JPEG/JFIF image file
  *
@@ -9,7 +9,7 @@ package jevc.utils;
  * @version 1.01
  */
 
-/**
+/*
  * THE FORMAT OF A JPEG/JFIF FILE IS:
  * -Header:
  * 	.It occupies two bytes.

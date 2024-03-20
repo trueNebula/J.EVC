@@ -6,9 +6,9 @@ import java.io.File;
 import java.io.IOException;
 
 public class RGBImage {
-    public int R[][];
-    public int G[][];
-    public int B[][];
+    public int[][] R;
+    public int[][] G;
+    public int[][] B;
     public int width, height;
 
     public RGBImage(int[][] pixels, int width, int height) {
@@ -20,7 +20,7 @@ public class RGBImage {
         FromRGBPixels (pixels, width, height);
     }
 
-    public RGBImage(int Y[][], int Cb[][], int Cr[][], int width, int height) {
+    public RGBImage(int[][] Y, int[][] Cb, int[][] Cr, int width, int height) {
         this.width = width;
         this.height = height;
         R = new int[height][width];
@@ -42,7 +42,7 @@ public class RGBImage {
             }
     }
 
-    public void FromYCbCr(int Y[][], int Cb[][], int Cr[][], int width, int height) {
+    public void FromYCbCr(int[][] Y, int[][] Cb, int[][] Cr, int width, int height) {
         for (int i=0; i<height; i++)
             for (int j=0; j<width; j++) {
                 R[i][j] = clamp((int) (Y[i][j] + 1.402*(Cr[i][j]-128)));
@@ -53,8 +53,7 @@ public class RGBImage {
 
     private int clamp(int val) {
         if (val < 0) return 0;
-        if (val > 255) return 255;
-        return val;
+        return Math.min(val, 255);
     }
 
     public void writePNGFile(String outfile) throws IOException {

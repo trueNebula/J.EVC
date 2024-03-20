@@ -1,6 +1,7 @@
 package jevc;
 
 import jevc.entities.YCbCrImage;
+import jevc.service.JPEGEncoderService;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -32,7 +33,7 @@ public class JPEGEncoder {
             }
 
         YCbCrImage image = new YCbCrImage(pixels, img.getWidth(), img.getHeight());
-        Encoder encoder = new Encoder(image, outputfile);
+        JPEGEncoderService encoder = new JPEGEncoderService(image, outputfile);
         encoder.compress();
 
     }

@@ -8,9 +8,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 
 public class YCbCrImage {
-    public int Y[][];
-    public int Cb[][];
-    public int Cr[][];
+    public int[][] Y;
+    public int[][] Cb;
+    public int[][] Cr;
     private int width, height;
     private int sampling;
 
@@ -73,29 +73,30 @@ public class YCbCrImage {
             System.out.println("Adding block " + block.getType() + " with positions " +
                     "[posY=" + block.getPosY() + ", posX=" + block.getPosX() + "] to the image ..");
             switch (block.getType()) {
-                case 'Y':
+                case 'Y' -> {
                     data = block.getData();
                     for (int i = 0; i < 8; i++) {
                         for (int j = 0; j < 8; j++) {
                             Y[block.getPosY() + i][block.getPosX() + j] = data[i][j];
                         }
                     }
-                    break;
-                case 'U':
+                }
+                case 'U' -> {
                     data = block.getData();
                     for (int i = 0; i < 8; i++) {
                         for (int j = 0; j < 8; j++) {
                             Cb[block.getPosY() + i][block.getPosX() + j] = data[i][j];
                         }
                     }
-                    break;
-                case 'V':
+                }
+                case 'V' -> {
                     data = block.getData();
                     for (int i = 0; i < 8; i++) {
                         for (int j = 0; j < 8; j++) {
                             Cr[block.getPosY() + i][block.getPosX() + j] = data[i][j];
                         }
                     }
+                }
             }
         }
     }
@@ -422,7 +423,7 @@ public class YCbCrImage {
         }
     }
 
-    public void FromRGBPixels(int R[][], int G[][], int B[][], int width, int height) {
+    public void FromRGBPixels(int[][] R, int[][] G, int[][] B, int width, int height) {
         int c;
         for (int i=0; i<height; i++)
             for (int j=0; j<width; j++) {
@@ -584,7 +585,7 @@ public class YCbCrImage {
         ArrayList<Block> CbBlocks = SplitColorBlocks('U');
         ArrayList<Block> CrBlocks = SplitColorBlocks('V');
         
-        ArrayList<Block> result = new ArrayList<Block>();
+        ArrayList<Block> result = new ArrayList<>();
         int noOfBlocks = (height*width) / (8*8);
         int horizNoOfBlocks = width / 8;
         int vertNoOfBlocks = height / 8;
@@ -709,10 +710,10 @@ public class YCbCrImage {
 
     /* Split one color component matrix (Y, Cb or Cr) into 8x8 blocks */
     private ArrayList<Block> SplitColorBlocks(char type) {
-        ArrayList<Block> result = new ArrayList<Block>();
+        ArrayList<Block> result = new ArrayList<>();
         if ((type!='Y') && (type!='U') && (type!='V'))
             return result;
-        int colors[][] = null;
+        int[][] colors;
         int localHeight = height;
         int localWidth = width;
         if (type=='Y') colors = this.Y;
@@ -731,7 +732,7 @@ public class YCbCrImage {
         System.out.println("blocktype " + type + " localHeight=" + localHeight + " localWidth= " + localWidth);
         for(int i=0; i<localHeight; i+=Block.BLOCKSIZE) {
             for (int j = 0; j < localWidth; j += Block.BLOCKSIZE) {
-                int data[][] = new int[Block.BLOCKSIZE][Block.BLOCKSIZE];
+                int[][] data = new int[Block.BLOCKSIZE][Block.BLOCKSIZE];
                 for (int x = 0; x < Block.BLOCKSIZE; x++) {
                     for (int y = 0; y < Block.BLOCKSIZE; y++) {
                         data[x][y] = colors[i + x][j + y];
@@ -744,7 +745,7 @@ public class YCbCrImage {
         return result;
     }
 
-    public static void computeSamplingFactors(int sampling, int horizSamplingFactors[], int vertSamplingFactors[]) {
+    public static void computeSamplingFactors(int sampling, int[] horizSamplingFactors, int[] vertSamplingFactors) {
         // `sampling` can be: YUV444Sampling, YUV422HorizSampling, YUV422VertSampling, YUV411Sampling
         // `horizSamplingFactors` and `vertSamplingFactors` have each 3 elements, for Y, Cb, Cr
         /* For a specific component (Y, Cb or Cr), the horizontal resolution of the component is
@@ -772,7 +773,7 @@ public class YCbCrImage {
         }
     }
 
-    public static int computeSamplingFromFactors(int horizSamplingFactors[], int vertSamplingFactors[]) {
+    public static int computeSamplingFromFactors(int[] horizSamplingFactors, int[] vertSamplingFactors) {
         // `horizSamplingFactors` and `vertSamplingFactors` have each 3 elements, for Y, Cb, Cr
         // returns `sampling` which can be: YUV444Sampling, YUV422HorizSampling, YUV422VertSampling, YUV411Sampling
         /* For a specific component (Y, Cb or Cr), the horizontal resolution of the component is
@@ -789,8 +790,8 @@ public class YCbCrImage {
                 maxVerticalSampling = vertSamplingFactors[i];
         }
 
-        float horiz_sampling[] = {1,1,1};
-        float vert_sampling[] = {1,1,1};
+        float[] horiz_sampling = {1,1,1};
+        float[] vert_sampling = {1,1,1};
 
         for (int i=0; i<3; i++) {
             horiz_sampling[i] = ((float) horizSamplingFactors[i]) / maxHorizontalSampling;
@@ -846,8 +847,7 @@ public class YCbCrImage {
 
     private int clamp(int val) {
         if (val < 0) return 0;
-        if (val > 255) return 255;
-        return val;
+        return Math.min(val, 255);
     }
 
     public void writePNGFile(String outfile) throws IOException {
@@ -868,7 +868,7 @@ public class YCbCrImage {
                 Color color = new Color(pixel, pixel, pixel);
                 image.setRGB(j, i, color.getRGB());
             }
-            System.out.println("");
+            System.out.println();
         }
         System.out.println(outfile + " Cb: ---------------------");
         ImageIO.write(image, "png", new File(outfile+"-Y.png"));
@@ -886,7 +886,7 @@ public class YCbCrImage {
                 Color color = new Color(pixel, pixel, pixel);
                 image.setRGB(j, i, color.getRGB());
             }
-            System.out.println("");
+            System.out.println();
         }
         System.out.println(outfile + " Cr: ---------------------");
         ImageIO.write(image, "png", new File(outfile+"-Cb.png"));
@@ -904,7 +904,7 @@ public class YCbCrImage {
                 Color color = new Color(pixel, pixel, pixel);
                 image.setRGB(j, i, color.getRGB());
             }
-            System.out.println("");
+            System.out.println();
         }
         ImageIO.write(image, "png", new File(outfile+"-Cr.png"));
     }

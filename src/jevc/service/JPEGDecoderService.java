@@ -1,9 +1,6 @@
-package jevc;
+package jevc.service;
 
-import jevc.entities.Block;
-import jevc.entities.RGBImage;
-import jevc.entities.RunLengthBlock;
-import jevc.entities.YCbCrImage;
+import jevc.entities.*;
 import jevc.operations.DiscreteCosineTransform;
 import jevc.operations.HuffmanEncoder;
 import jevc.operations.Quantizer;
@@ -15,53 +12,30 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
 
-class Component {
-    /* each component is described by 3 bytes of data:
-     *	    .id : 1=Y, 2=Cb, 3=Cr, 4=I, 5=Q
-     *	    .sampling factors : bits 0-3 vertical, 4-7 horizontal
-     *	    .quantization table number
-     *      .huffman table number
-     */
-    public int id;
-    public int verticalSampling, horizontalSampling;
-    public int quantizationTblIxd;
-    public int AChuffmanTblIdx;
-    public int DChuffmanTblIdx;
+public class JPEGDecoderService extends JPEGHeader {
+    private final String inputFile;
 
-    public Component() {
-        id = -1;
-        verticalSampling = horizontalSampling = -1;
-        quantizationTblIxd = -1;
-        AChuffmanTblIdx = -1;
-        DChuffmanTblIdx = -1;
-    }
-}
-
-public class Decoder extends JPEGHeader {
-    private String inputFile;
-
-    private YCbCrImage image;
-    private DiscreteCosineTransform DCT;
-    private Quantizer quantizer;
-    private RunLengthEncoder runlengthEncoder;
-    private HuffmanEncoder huffmanEncoder;
+    private final DiscreteCosineTransform DCT;
+    private final Quantizer quantizer;
+    private final RunLengthEncoder runlengthEncoder;
+    private final HuffmanEncoder huffmanEncoder;
     private byte[] pixelByteArray;
 
     private int height;
     private int width;
-    private int noOfComponents; // 1 (gray scaled), 3 (YUV or YIQ), 4 (CMYK)
-    private Component components[];
+    private ImageComponent[] imageComponents;
     private int YMCUIndex, CbMCUIndex, CrMCUIndex;
     private int YinnerMCUIdx, CbinnerMCUIdx, CrinnerMCUIdx;
-    /* A MCU (Minimum Coded Unit) is defined for each component (Y, Cb and Cr). And in our code
-     * the size of a MCU of one component can be different than the size of the MCU of another
+
+    /* An MCU (Minimum Coded Unit) is defined for each component (Y, Cb and Cr). And in our code
+     * the size of an MCU of one component can be different from the size of the MCU of another
      * component. In our code, the MCU of component[i] is a rectangle of 8x8 blocks formed by
-     * component[i].verticalSampling * component[i].horizontalSampling blocks and it has
+     * component[i].verticalSampling * component[i].horizontalSampling blocks, and it has
      * component[i].verticalSampling 8x8 blocks on OY axis and component[i].horizontalSampling
      * 8x8 blocks on the OX axis.
-     * Note that this is different than what is specified in the JPEG standard where the MCU is
+     * Note that this is different from what is specified in the JPEG standard where the MCU is
      * just an image region and is the same for all components. For example, in JPEG standard
-     * for 411 subsampling, one MCU is a 4x4 blocks region from the whole image and it contains:
+     * for 411 subsampling, one MCU is a 4x4 blocks region from the whole image, and it contains:
      * 4 Y type blocks, 1 Cb type block and 1 Cr type block; but the region in the image is the
      * same for all three components. While in our code, for 411 sampling one MCU of type Y is
      * a region from the whole image containing 4x8x8 pixels (i.e. 4 8x8 blocks), one MCU of type
@@ -92,7 +66,7 @@ public class Decoder extends JPEGHeader {
     int[] Huffman_vals_ac_luminance = new int[162];
     int[] Huffman_vals_ac_chrominance = new int[162];
 
-    public Decoder(String inputFile) {
+    public JPEGDecoderService(String inputFile) {
         this.inputFile = inputFile;
         DCT = new DiscreteCosineTransform();
         quantizer = new Quantizer();
@@ -120,7 +94,6 @@ public class Decoder extends JPEGHeader {
         byte[] buffer = new byte[bitstreamSize];
         pixelByteArray = new byte[bitstreamSize-2];
         int i = 0;
-        byte val;
         try {
             while (true) {
                 buffer[i] = (byte) fjpg.readUnsignedByte();
@@ -144,7 +117,7 @@ public class Decoder extends JPEGHeader {
 
     public RGBImage decode() {
         ArrayList<RunLengthBlock> rleBlocksArray;
-        ArrayList<Block> blocks = new ArrayList<Block>();
+        ArrayList<Block> blocks = new ArrayList<>();
         Block block;
         YMCUIndex = CbMCUIndex = CrMCUIndex = 0;
         YinnerMCUIdx = CbinnerMCUIdx = CrinnerMCUIdx = 0;
@@ -170,17 +143,16 @@ public class Decoder extends JPEGHeader {
             i++;
         }
 
-        image = new YCbCrImage(blocks, height, width, sampling);
+        YCbCrImage image = new YCbCrImage(blocks, height, width, sampling);
         image.PerformUpsampling();
         return image.convertToRGBImage();
     }
 
-    private void readJPEGHeaders(RandomAccessFile fjpg) throws IOException {
-        byte val = 0,b1,b2;
-        byte buffer[] = new byte[max_segm_size];
+    private void readJPEGHeaders(RandomAccessFile fjpg) {
+        byte val;
+        byte[] buffer = new byte[max_segm_size];
         int i,j,x,size;
         int sos = 0;
-        i = 0;
         try {
             /* read the SOI */
             fjpg.readFully(buffer,0,2);
@@ -191,7 +163,7 @@ public class Decoder extends JPEGHeader {
             System.out.println("SOI --------------------------------------------------------");
 
             /* read JFIF segment (APP0 marker) */
-            /**
+            /*
              * Structure of the JFIF segment:
              * - JFIF marker (2 bytes)
              * - length of the segment without JFIF marker and including this 2-byte length field (2 bytes)
@@ -250,13 +222,13 @@ public class Decoder extends JPEGHeader {
             /* read X thumbnail */
             val = fjpg.readByte();
             j += 1;
-            x = (int)val;
+            x = val;
             System.out.println("        	thumbnail horizontal pixel count:"+(int)val);
 
             /* read Y thumbnail */
             val = fjpg.readByte();
             j += 1;
-            x *= (int)val;
+            x *= val;
             System.out.println("        	thumbnail vertical pixel count:"+(int)val);
 
             /* packed RGB values for the thumbnail pixels (3*Xthumbnail*Ythumbnail), if are there any */
@@ -282,13 +254,13 @@ public class Decoder extends JPEGHeader {
                     if (buffer[0]==0x00) fjpg.readFully(buffer,0,1);
                 }
                 i = 1;
-                /**
+                /*
                  * Depending on the marker found in buffer[0], we take two kinds of actions:
                  * o if buffer[0] != SOS, we read bytes until we find a PREFIX (which means that a new segment starts)
                  * o if buffer[0] == SOS, this means that this is the last segment from the JFIF file and immediately
                  *   after it the compressed image data follows and then the [0xff,0xd9] marker which completes the
                  *   JFIF file. In this case, we determine the size of the segment by reading the first two bytes
-                 *   following the segment marker (buffer[0]) and than we read as many bytes as the calculated size
+                 *   following the segment marker (buffer[0]) and then we read as many bytes as the calculated size
                  *   tells us to.
                  */
                 if (buffer[0] != SOS) {
@@ -303,217 +275,120 @@ public class Decoder extends JPEGHeader {
                     fjpg.readFully(buffer,i,size-2);
                     i += size-2;
                 }
-                switch(buffer[0]) {
-                    case APP1:
-                        dumpAPPsegment("APP1",buffer,i-1);
-                        break;
-                    case APP2:
-                        dumpAPPsegment("APP2",buffer,i-1);
-                        break;
-                    case APP3:
-                        dumpAPPsegment("APP3",buffer,i-1);
-                        break;
-                    case APP4:
-                        dumpAPPsegment("APP4",buffer,i-1);
-                        break;
-                    case APP5:
-                        dumpAPPsegment("APP5",buffer,i-1);
-                        break;
-                    case APP6:
-                        dumpAPPsegment("APP6",buffer,i-1);
-                        break;
-                    case APP7:
-                        dumpAPPsegment("APP7",buffer,i-1);
-                        break;
-                    case APP8:
-                        dumpAPPsegment("APP8",buffer,i-1);
-                        break;
-                    case APP9:
-                        dumpAPPsegment("APP9",buffer,i-1);
-                        break;
-                    case APP10:
-                        dumpAPPsegment("APP10",buffer,i-1);
-                        break;
-                    case APP11:
-                        dumpAPPsegment("APP11",buffer,i-1);
-                        break;
-                    case APP12:
-                        dumpAPPsegment("APP12",buffer,i-1);
-                        break;
-                    case APP13:
-                        dumpAPPsegment("APP13",buffer,i-1);
-                        break;
-                    case APP14:
-                        dumpAPPsegment("APP14",buffer,i-1);
-                        break;
-                    case APP15:
-                        dumpAPPsegment("APP15",buffer,i-1);
-                        break;
-                    case SOF0:
-                        parseSOFsegment("SOF0",buffer,i-1);
-                        break;
-                    case SOF1:
-                        parseSOFsegment("SOF1",buffer,i-1);
+                switch (buffer[0]) {
+                    case APP1 -> dumpAPPsegment("APP1", buffer, i - 1);
+                    case APP2 -> dumpAPPsegment("APP2", buffer, i - 1);
+                    case APP3 -> dumpAPPsegment("APP3", buffer, i - 1);
+                    case APP4 -> dumpAPPsegment("APP4", buffer, i - 1);
+                    case APP5 -> dumpAPPsegment("APP5", buffer, i - 1);
+                    case APP6 -> dumpAPPsegment("APP6", buffer, i - 1);
+                    case APP7 -> dumpAPPsegment("APP7", buffer, i - 1);
+                    case APP8 -> dumpAPPsegment("APP8", buffer, i - 1);
+                    case APP9 -> dumpAPPsegment("APP9", buffer, i - 1);
+                    case APP10 -> dumpAPPsegment("APP10", buffer, i - 1);
+                    case APP11 -> dumpAPPsegment("APP11", buffer, i - 1);
+                    case APP12 -> dumpAPPsegment("APP12", buffer, i - 1);
+                    case APP13 -> dumpAPPsegment("APP13", buffer, i - 1);
+                    case APP14 -> dumpAPPsegment("APP14", buffer, i - 1);
+                    case APP15 -> dumpAPPsegment("APP15", buffer, i - 1);
+                    case SOF0 -> parseSOFsegment("SOF0", buffer, i - 1);
+                    case SOF1 -> {
+                        parseSOFsegment("SOF1", buffer, i - 1);
                         System.out.println("SOF1 segment found! This file is not encoded with the Baseline DCT algorithm (i.e. SOF0 segment required). Exiting..");
                         System.exit(-1);
-                        break;
-                    case SOF2:
-                        parseSOFsegment("SOF2",buffer,i-1);
+                    }
+                    case SOF2 -> {
+                        parseSOFsegment("SOF2", buffer, i - 1);
                         System.out.println("SOF2 segment found! This file is not encoded with the Baseline DCT algorithm (i.e. SOF0 segment required). Exiting..");
                         System.exit(-1);
-                        break;
-                    case SOF3:
-                        parseSOFsegment("SOF3",buffer,i-1);
+                    }
+                    case SOF3 -> {
+                        parseSOFsegment("SOF3", buffer, i - 1);
                         System.out.println("SOF3 segment found! This file is not encoded with the Baseline DCT algorithm (i.e. SOF0 segment required). Exiting..");
                         System.exit(-1);
-                        break;
-                    case SOF5:
-                        parseSOFsegment("SOF5",buffer,i-1);
+                    }
+                    case SOF5 -> {
+                        parseSOFsegment("SOF5", buffer, i - 1);
                         System.out.println("SOF5 segment found! This file is not encoded with the Baseline DCT algorithm (i.e. SOF0 segment required). Exiting..");
                         System.exit(-1);
-                        break;
-                    case SOF6:
-                        parseSOFsegment("SOF6",buffer,i-1);
+                    }
+                    case SOF6 -> {
+                        parseSOFsegment("SOF6", buffer, i - 1);
                         System.out.println("SOF6 segment found! This file is not encoded with the Baseline DCT algorithm (i.e. SOF0 segment required). Exiting..");
                         System.exit(-1);
-                        break;
-                    case SOF7:
-                        parseSOFsegment("SOF7",buffer,i-1);
+                    }
+                    case SOF7 -> {
+                        parseSOFsegment("SOF7", buffer, i - 1);
                         System.out.println("SOF7 segment found! This file is not encoded with the Baseline DCT algorithm (i.e. SOF0 segment required). Exiting..");
                         System.exit(-1);
-                        break;
-                    case SOF9:
-                        parseSOFsegment("SOF9",buffer,i-1);
+                    }
+                    case SOF9 -> {
+                        parseSOFsegment("SOF9", buffer, i - 1);
                         System.out.println("SOF9 segment found! This file is not encoded with the Baseline DCT algorithm (i.e. SOF0 segment required). Exiting..");
                         System.exit(-1);
-                        break;
-                    case SOF10:
-                        parseSOFsegment("SOF10",buffer,i-1);
+                    }
+                    case SOF10 -> {
+                        parseSOFsegment("SOF10", buffer, i - 1);
                         System.out.println("SOF10 segment found! This file is not encoded with the Baseline DCT algorithm (i.e. SOF0 segment required). Exiting..");
                         System.exit(-1);
-                        break;
-                    case SOF11:
-                        parseSOFsegment("SOF11",buffer,i-1);
+                    }
+                    case SOF11 -> {
+                        parseSOFsegment("SOF11", buffer, i - 1);
                         System.out.println("SOF11 segment found! This file is not encoded with the Baseline DCT algorithm (i.e. SOF0 segment required). Exiting..");
                         System.exit(-1);
-                        break;
-                    case SOF13:
-                        parseSOFsegment("SOF13",buffer,i-1);
+                    }
+                    case SOF13 -> {
+                        parseSOFsegment("SOF13", buffer, i - 1);
                         System.out.println("SOF13 segment found! This file is not encoded with the Baseline DCT algorithm (i.e. SOF0 segment required). Exiting..");
                         System.exit(-1);
-                        break;
-                    case SOF14:
-                        parseSOFsegment("SOF14",buffer,i-1);
+                    }
+                    case SOF14 -> {
+                        parseSOFsegment("SOF14", buffer, i - 1);
                         System.out.println("SOF14 segment found! This file is not encoded with the Baseline DCT algorithm (i.e. SOF0 segment required). Exiting..");
                         System.exit(-1);
-                        break;
-                    case SOF15:
-                        parseSOFsegment("SOF15",buffer,i-1);
+                    }
+                    case SOF15 -> {
+                        parseSOFsegment("SOF15", buffer, i - 1);
                         System.out.println("SOF15 segment found! This file is not encoded with the Baseline DCT algorithm (i.e. SOF0 segment required). Exiting..");
                         System.exit(-1);
-                        break;
-                    case DHT:
-                        parseDHTsegment(buffer,i-1);
-                        break;
-                    case DQT:
-                        parseDQTsegment(buffer,i-1);
-                        break;
-                    case JPG:
-                        dumpJPGsegment("JPG",buffer,i-1);
-                        break;
-                    case JPG0:
-                        dumpJPGsegment("JPG0",buffer,i-1);
-                        break;
-                    case JPG1:
-                        dumpJPGsegment("JPG1",buffer,i-1);
-                        break;
-                    case JPG2:
-                        dumpJPGsegment("JPG2",buffer,i-1);
-                        break;
-                    case JPG3:
-                        dumpJPGsegment("JPG3",buffer,i-1);
-                        break;
-                    case JPG4:
-                        dumpJPGsegment("JPG4",buffer,i-1);
-                        break;
-                    case JPG5:
-                        dumpJPGsegment("JPG5",buffer,i-1);
-                        break;
-                    case JPG6:
-                        dumpJPGsegment("JPG6",buffer,i-1);
-                        break;
-                    case JPG7:
-                        dumpJPGsegment("JPG7",buffer,i-1);
-                        break;
-                    case JPG8:
-                        dumpJPGsegment("JPG8",buffer,i-1);
-                        break;
-                    case JPG9:
-                        dumpJPGsegment("JPG9",buffer,i-1);
-                        break;
-                    case JPG10:
-                        dumpJPGsegment("JPG10",buffer,i-1);
-                        break;
-                    case JPG11:
-                        dumpJPGsegment("JPG11",buffer,i-1);
-                        break;
-                    case JPG12:
-                        dumpJPGsegment("JPG12",buffer,i-1);
-                        break;
-                    case JPG13:
-                        dumpJPGsegment("JPG13",buffer,i-1);
-                        break;
-                    case DAC:
-                        dumpDACsegment(buffer,i-1);
-                        break;
-                    case DNL:
-                        dumpDNLsegment(buffer,i-1);
-                        break;
-                    case DRI:
-                        dumpDRIsegment(buffer,i-1);
-                        break;
-                    case DHP:
-                        dumpDHPsegment(buffer,i-1);
-                        break;
-                    case EXP:
-                        dumpEXPsegment(buffer,i-1);
-                        break;
-                    case RST0:
-                        dumpRSTsegment("RST0",buffer,i-1);
-                        break;
-                    case RST1:
-                        dumpRSTsegment("RST1",buffer,i-1);
-                        break;
-                    case RST2:
-                        dumpRSTsegment("RST2",buffer,i-1);
-                        break;
-                    case RST3:
-                        dumpRSTsegment("RST3",buffer,i-1);
-                        break;
-                    case RST4:
-                        dumpRSTsegment("RST4",buffer,i-1);
-                        break;
-                    case RST5:
-                        dumpRSTsegment("RST5",buffer,i-1);
-                        break;
-                    case RST6:
-                        dumpRSTsegment("RST6",buffer,i-1);
-                        break;
-                    case RST7:
-                        dumpRSTsegment("RST7",buffer,i-1);
-                        break;
-                    case TEM:
-                        dumpTEMsegment(buffer,i-1);
-                        break;
-                    case COM:
-                        dumpCOMsegment(buffer,i-1);
-                        break;
-                    case SOS:
-                        parseSOSsegment(buffer,i);
+                    }
+                    case DHT -> parseDHTsegment(buffer, i - 1);
+                    case DQT -> parseDQTsegment(buffer, i - 1);
+                    case JPG -> dumpJPGsegment("JPG", buffer, i - 1);
+                    case JPG0 -> dumpJPGsegment("JPG0", buffer, i - 1);
+                    case JPG1 -> dumpJPGsegment("JPG1", buffer, i - 1);
+                    case JPG2 -> dumpJPGsegment("JPG2", buffer, i - 1);
+                    case JPG3 -> dumpJPGsegment("JPG3", buffer, i - 1);
+                    case JPG4 -> dumpJPGsegment("JPG4", buffer, i - 1);
+                    case JPG5 -> dumpJPGsegment("JPG5", buffer, i - 1);
+                    case JPG6 -> dumpJPGsegment("JPG6", buffer, i - 1);
+                    case JPG7 -> dumpJPGsegment("JPG7", buffer, i - 1);
+                    case JPG8 -> dumpJPGsegment("JPG8", buffer, i - 1);
+                    case JPG9 -> dumpJPGsegment("JPG9", buffer, i - 1);
+                    case JPG10 -> dumpJPGsegment("JPG10", buffer, i - 1);
+                    case JPG11 -> dumpJPGsegment("JPG11", buffer, i - 1);
+                    case JPG12 -> dumpJPGsegment("JPG12", buffer, i - 1);
+                    case JPG13 -> dumpJPGsegment("JPG13", buffer, i - 1);
+                    case DAC -> dumpDACsegment(buffer, i - 1);
+                    case DNL -> dumpDNLsegment(buffer, i - 1);
+                    case DRI -> dumpDRIsegment(buffer, i - 1);
+                    case DHP -> dumpDHPsegment(buffer, i - 1);
+                    case EXP -> dumpEXPsegment(buffer, i - 1);
+                    case RST0 -> dumpRSTsegment("RST0", i - 1);
+                    case RST1 -> dumpRSTsegment("RST1", i - 1);
+                    case RST2 -> dumpRSTsegment("RST2", i - 1);
+                    case RST3 -> dumpRSTsegment("RST3", i - 1);
+                    case RST4 -> dumpRSTsegment("RST4", i - 1);
+                    case RST5 -> dumpRSTsegment("RST5", i - 1);
+                    case RST6 -> dumpRSTsegment("RST6", i - 1);
+                    case RST7 -> dumpRSTsegment("RST7", i - 1);
+                    case TEM -> dumpTEMsegment(i - 1);
+                    case COM -> dumpCOMsegment(buffer, i - 1);
+                    case SOS -> {
+                        parseSOSsegment(buffer, i);
                         sos = 1;
-                        break;
-                    default:
-                        System.err.println("Marker not recognized!");
+                    }
+                    default -> System.err.println("Marker not recognized!");
                 }
                 buffer[0]=PREFIX; // put the last byte read (PREFIX) in the first element of the buffer
 
@@ -531,7 +406,7 @@ public class Decoder extends JPEGHeader {
 
     }
 
-    private boolean equal(byte[] first,byte[] second,int length) {
+    private boolean equal(byte[] first, byte[] second, int length) {
         for(int i=0; i<length; i++)
             if(first[i]!=second[i]) return false;
         return true;
@@ -573,7 +448,7 @@ public class Decoder extends JPEGHeader {
         int x,z;
         if (type!=null && type.equals("SOF0")) {
             System.out.println("        "+type+" segment encountered:");
-            /** the structure of the SOF0 segment is:
+            /* the structure of the SOF0 segment is:
              * o the SOF0 marker (0xff,0xc0) - 2 bytes (buffer starts only from 0xc0, so buffer[0]=0xc0)
              * o the length of the segment (2 bytes) without the SOF0 marker, but including these
              *   2 bytes for representing the length - equal to 8+component*3
@@ -604,46 +479,39 @@ public class Decoder extends JPEGHeader {
             x |= ((int) buffer[7] & 0xff);
             System.out.println("        	.image width = "+x);
             this.width = x;
-            this.noOfComponents = buffer[8];
-            switch(buffer[8]) {
-                case 1:
-                    System.out.println("        	.the image is gray scaled");
-                    break;
-                case 3:
-                    System.out.println("        	.the image is in YCbCr or YIQ format");
-                    break;
-                case 4:
-                    System.out.println("        	.the image is in CMYK format");
-                    break;
-                default:
-                    System.out.println("        	.the image has "+buffer[8]+" components");
-                    break;
+            // 1 (gray scaled), 3 (YUV or YIQ), 4 (CMYK)
+            int noOfComponents = buffer[8];
+            switch (buffer[8]) {
+                case 1 -> System.out.println("        	.the image is gray scaled");
+                case 3 -> System.out.println("        	.the image is in YCbCr or YIQ format");
+                case 4 -> System.out.println("        	.the image is in CMYK format");
+                default -> System.out.println("        	.the image has " + buffer[8] + " components");
             }
             System.out.println("        	.the image components (id= 1(Y), 2(Cb), 3(Cr), 4(I), 5(Q))");
-            this.components = new Component[6];
+            this.imageComponents = new ImageComponent[6];
             for (int k=0; k<=5; k++) {
-                this.components[k] = new Component();
+                this.imageComponents[k] = new ImageComponent();
             }
             for(int i=9; i<=len-3; i+=3) {
                 x=((int) buffer[i+1]) & 0x0f;
                 z=((int) buffer[i+1]) & 0xf0;
                 z >>= 4;
                 System.out.println("        		*id="+buffer[i]+",vert_sampl_factor="+x+" horiz_sampl_factor="+z+",Q table no.="+buffer[i+2]);
-                this.components[buffer[i]].id = buffer[i];
-                this.components[buffer[i]].verticalSampling = x;
-                this.components[buffer[i]].horizontalSampling = z;
-                this.components[buffer[i]].quantizationTblIxd = buffer[i+2];
+                this.imageComponents[buffer[i]].id = buffer[i];
+                this.imageComponents[buffer[i]].verticalSampling = x;
+                this.imageComponents[buffer[i]].horizontalSampling = z;
+                this.imageComponents[buffer[i]].quantizationTblIxd = buffer[i+2];
             }
-            if ((this.noOfComponents!=3) || (this.components[1].id==-1) ||
-                    (this.components[2].id==-1) || (this.components[3].id==-1)) {
+            if ((noOfComponents !=3) || (this.imageComponents[1].id==-1) ||
+                    (this.imageComponents[2].id==-1) || (this.imageComponents[3].id==-1)) {
                 System.err.println("The components of this image are not Y Cb Cr! Exiting..");
                 System.exit(-1);
             }
             int[] horizSamplingFactors = new int[3];
             int[] vertSamplingFactors = new int[3];
             for(int i=0; i<3; i++) {
-                horizSamplingFactors[i] = this.components[i+1].horizontalSampling;
-                vertSamplingFactors[i] = this.components[i+1].verticalSampling;
+                horizSamplingFactors[i] = this.imageComponents[i+1].horizontalSampling;
+                vertSamplingFactors[i] = this.imageComponents[i+1].verticalSampling;
             }
             this.sampling = YCbCrImage.computeSamplingFromFactors(horizSamplingFactors, vertSamplingFactors);
             huffmanEncoder.setSamplingFactors(horizSamplingFactors, vertSamplingFactors);
@@ -653,7 +521,7 @@ public class Decoder extends JPEGHeader {
              * I will skip this for simplicity reasons and allow some padding for width and height of the
              * decoded image.
              */
-            int tuple[] = YCbCrImage.adjustResolutionBasedonSampling(this.width, this.height, this.sampling);
+            int[] tuple = YCbCrImage.adjustResolutionBasedonSampling(this.width, this.height, this.sampling);
             this.width = tuple[0];
             this.height = tuple[1];
             System.out.println("        	.image width (adjusted based on sampling) = " + this.width);
@@ -767,10 +635,9 @@ public class Decoder extends JPEGHeader {
      * its size and hope for the best:)
      * @param type the type of this RST segment. Must be one of
      * 		   RST0,RST1,RST2,RST3,RST4,RST5,RST6,RST7.
-     * @param buffer the buffer containing the segment data
      * @param len the length of the buffer
      */
-    private void dumpRSTsegment(String type,byte[] buffer,int len) {
+    private void dumpRSTsegment(String type, int len) {
         System.out.println("        "+type+" segment encountered (length="+(len-1)+").");
     }
 
@@ -778,10 +645,9 @@ public class Decoder extends JPEGHeader {
      * Dumps on the screen a TEM segment. Since this kind of segment
      * does not have 2 bytes for its size, we just print len-1 as
      * its size and hope for the best:)
-     * @param buffer the buffer containing the segment data
      * @param len the length of the buffer
      */
-    private void dumpTEMsegment(byte[] buffer,int len) {
+    private void dumpTEMsegment(int len) {
         System.out.println("        TEM segment encountered (length="+(len-1)+").");
     }
 
@@ -792,7 +658,7 @@ public class Decoder extends JPEGHeader {
      */
     private void dumpCOMsegment(byte[] buffer,int len) {
         int size;
-        /**
+        /*
          * the structure of the COM segment is:
          * -the COM marker (0xff,0xfe) - 2 bytes (buffer starts only from 0xfe, so buffer[0]=0xfe)
          * -the length of the segment (2 bytes) without the COM marker, but including these
@@ -814,13 +680,13 @@ public class Decoder extends JPEGHeader {
      * @param len the length of the buffer
      */
     private void dumpDRIsegment(byte[] buffer,int len) {
-        /**
+        /*
          * the structure of the DRI segment is:
          * -the DRI marker (0xff,0xdd) - 2 bytes (buffer starts only from 0xdd, so buffer[0]=0xdd)
          * -the length of the segment (2 bytes) without the DRI marker, but including these
          *   2 bytes for representing the length - it must be 4
          * -restart interval (2 bytes) - this is in units of MCU blocks, means that every n MCU
-         *   blocks a RSTn marker can be found. The first marker will be RST0, then RST1 etc,
+         *   blocks a RSTn marker can be found. The first marker will be RST0, then RST1 etc.,
          *   after RST7 repeating from RST0
          */
         int x,y;
@@ -842,7 +708,7 @@ public class Decoder extends JPEGHeader {
      * @param len the length of the buffer
      */
     private void parseDQTsegment(byte[] buffer, int len) {
-        /**
+        /*
          * the structure of the DQT segment is:
          * o the DQT marker (0xff,0xdb) - 2 bytes (buffer doesn't contain 0xff, it starts with 0xdb)
          * o length (2 bytes) of the DQT segment without the DQT marker, but including the bytes
@@ -861,7 +727,7 @@ public class Decoder extends JPEGHeader {
         System.out.println("        DQT segment encountered (length="+size+")");
         System.out.println("        	.The Quantization Tables in ZIGZAG order:");
         i = 3;
-        while(i<=size && i<len) {
+        while(i<=size) {
             /* print one Q table */
             /* determine the no. and precision for this QT */
             no = ((int) buffer[i]) & 0x0f;
@@ -902,7 +768,7 @@ public class Decoder extends JPEGHeader {
      * @param len the length of the buffer
      */
     private void parseDHTsegment(byte[] buffer, int len) {
-        /**
+        /*
          * the structure of the DHT segment is:
          * o the DHT marker (0xff,0xc4) - 2 bytes (buffer doesn't contain 0xff, it starts with 0xc4)
          * o length (2 bytes) of the DHT segment without the DHT marker, but including the bytes
@@ -922,7 +788,7 @@ public class Decoder extends JPEGHeader {
         int[] currentValsArray = Huffman_vals_dc_luminance;
         int size,i,j,k,x,no,type/* type=0 -> DC || type=1 -> AC */;
         int n;
-        int symbol_no[]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}; // symbol_no[i] is the no. of symbols with codes of length i+1
+        int[] symbol_no ={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}; // symbol_no[i] is the no. of symbols with codes of length i+1
 
         size = ((int) buffer[1]) & 0xff;
         size <<= 8;
@@ -932,7 +798,7 @@ public class Decoder extends JPEGHeader {
         System.out.println("        DHT segment encountered (length="+size+")");
         System.out.println("        	.The Huffman Tables are:");
         i=3;
-        while(i<=size && i<len) {
+        while(i<=size) {
             /* print one H table */
             /* determine no. and type for this HT */
             no = ((int) buffer[i]) & 0x0f;
@@ -1000,13 +866,13 @@ public class Decoder extends JPEGHeader {
     }
 
     /**
-     * Dumps on the screen the content of a SOS (Start of Scan) segment.
+     * Dumps on the screen the content of an SOS (Start of Scan) segment.
      * @param buffer the buffer containing the segment data
      * @param len the length of the buffer
      */
     private void parseSOSsegment(byte[] buffer, int len) {
-        /**
-         * the structure of a SOS segment:
+        /*
+         * the structure of an SOS segment:
          * -the SOS marker (0xff,0xda) - 2 bytes (buffer doesn't contain 0xff, it starts with 0xda)
          * -length (2 bytes) of the SOS segment without the SOS marker, but including the bytes
          *   for this field - must be equal to 6+2*(no. of components in scan)
@@ -1040,8 +906,8 @@ public class Decoder extends JPEGHeader {
             i += 2;
             dc = (huff & 0xf0) >>4;
             ac = (huff & 0x0f);
-            components[id].DChuffmanTblIdx = dc;
-            components[id].AChuffmanTblIdx = ac;
+            imageComponents[id].DChuffmanTblIdx = dc;
+            imageComponents[id].AChuffmanTblIdx = ac;
             System.out.println("        	.Component "+id+" AC table="+ac+" DC table="+dc);
         }
         /* if those 3 ignorable bytes are not present, error? */
@@ -1054,7 +920,7 @@ public class Decoder extends JPEGHeader {
     }
 
     private int[] computeNextBlockPosition(char blocktype) {
-        int Ypos = -1, Xpos = -1;
+        int Ypos, Xpos;
         int samplingWidth = width;
         int hSamplingFactor, vSamplingFactor, MCUIndex, innerMCUIdx;
         int MCUtopPos, MCUleftPos, OYoffset, OXoffset;
@@ -1063,24 +929,25 @@ public class Decoder extends JPEGHeader {
 
         if ((blocktype!='Y') && (blocktype!='U') && (blocktype!='V'))
             return new int[] {-1, -1};
-        switch(blocktype) {
-            case 'Y':
-                hSamplingFactor = components[1].horizontalSampling;
-                vSamplingFactor = components[1].verticalSampling;
+        switch (blocktype) {
+            case 'Y' -> {
+                hSamplingFactor = imageComponents[1].horizontalSampling;
+                vSamplingFactor = imageComponents[1].verticalSampling;
                 MCUIndex = YMCUIndex;
                 innerMCUIdx = YinnerMCUIdx;
-                break;
-            case 'U':
-                hSamplingFactor = components[2].horizontalSampling;
-                vSamplingFactor = components[2].verticalSampling;
+            }
+            case 'U' -> {
+                hSamplingFactor = imageComponents[2].horizontalSampling;
+                vSamplingFactor = imageComponents[2].verticalSampling;
                 MCUIndex = CbMCUIndex;
                 innerMCUIdx = CbinnerMCUIdx;
-                break;
-            case 'V':
-                hSamplingFactor = components[3].horizontalSampling;
-                vSamplingFactor = components[3].verticalSampling;
+            }
+            case 'V' -> {
+                hSamplingFactor = imageComponents[3].horizontalSampling;
+                vSamplingFactor = imageComponents[3].verticalSampling;
                 MCUIndex = CrMCUIndex;
                 innerMCUIdx = CrinnerMCUIdx;
+            }
         }
 
         // here we don't deal with all possible (horizontalSamplingFactor,verticalSamplingFactor)
@@ -1112,18 +979,19 @@ public class Decoder extends JPEGHeader {
         }
 
         // update the global MCUIndex and innerMCUIdx
-        switch(blocktype) {
-            case 'Y':
+        switch (blocktype) {
+            case 'Y' -> {
                 YMCUIndex = MCUIndex;
                 YinnerMCUIdx = innerMCUIdx;
-                break;
-            case 'U':
+            }
+            case 'U' -> {
                 CbMCUIndex = MCUIndex;
                 CbinnerMCUIdx = innerMCUIdx;
-                break;
-            case 'V':
+            }
+            case 'V' -> {
                 CrMCUIndex = MCUIndex;
                 CrinnerMCUIdx = innerMCUIdx;
+            }
         }
 
         return new int[] {Xpos, Ypos};
@@ -1135,7 +1003,7 @@ public class Decoder extends JPEGHeader {
      */
     private String printHex(byte b) {
         char[] digits={'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
-        char s[]=new char[4];
+        char[] s =new char[4];
         int i,j;
         i = ((int) b) & 0xf0;
         i >>= 4;

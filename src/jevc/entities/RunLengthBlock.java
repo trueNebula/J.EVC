@@ -13,7 +13,7 @@ public class RunLengthBlock {
     }
 
     public RunLengthBlock() {
-        data = new ArrayList<RunLength>();
+        data = new ArrayList<>();
         type = '-';
     }
 

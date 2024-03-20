@@ -2,7 +2,7 @@ package jevc.entities;
 
 public class Block {
     public static final int BLOCKSIZE = 8;
-    private char type; // 'Y', 'U', 'V'
+    private final char type; // 'Y', 'U', 'V'
     private int posX;
     private int posY;
     private int[][] data;

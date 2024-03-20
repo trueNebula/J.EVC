@@ -8,55 +8,54 @@ import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 
+/*
+ * JPEG entropy encoding of an 8x8 block works in the following way:
+ * 1. The DC coefficient is predictively encoded (i.e. the current DC is predicted
+ * from the DC of the previous block) as:
+ *          (SIZE), (AMPLITUDE)
+ * where AMPLITUDE is the differential DC value (i.e. current DC minus the DC of
+ * the previous block) represented in binary on a variable (minimum) number of bits
+ * and SIZE is the Huffman codeword for the number of bits used in the AMPLITUDE binary
+ * representation (i.e. so the actual size/length in bits of the AMPLITUDE is the
+ * symbol and we encode it as a Huffman codeword).
+ *
+ * 2. A single runlength of AC coefficients (RUN, AMPLITUDE) is encoded in the
+ * following way:
+ *          (RUN,SIZE), (AMPLITUDE)
+ * where similarly as for DC, the AMPLITUDE is the actual value of the current non
+ * zero AC coefficient represented in binary on a variable (minimum) number of bits,
+ * RUN is the runlength (i.e. number of consecutive zeroes before this AC coefficient)
+ * and SIZE is the number of bits used in the AMPLITUDE binary representation. The
+ * (RUN, SIZE) pair is encoded as a variable bit Huffman codeword.
+ *
+ * The Huffman codewords for the (SIZE) symbol in DC coefficient representation and the
+ * (RUN, SIZE) pair in the non-zero AC coefficient representation can be computed on
+ * the fly by the JPEG encoder or the encoder can use the standard ones described in
+ * the JPEG standard on pages 149-157. The JPEG standard describes 4 tables of Huffman
+ * codewords:
+ *      o for the luminance DC coefficients
+ *      o for the chrominance DC coefficients
+ *      o for the luminance AC coefficients
+ *      o for the chrominance AC coefficients
+ *
+ * The JPEG standard computes each standard table of Huffman codewords (i.e. each of
+ * those 4 standard Huffman tables mentioned above: luma DC, chroma DC, luma AC, chroma
+ * AC) out of 2 vectors:
+ *      o BITS[] - is a list of numbers/counts of Huffman codewords with a specific length
+ *                 (in number of bits); BITS[i] is the number of Huffman codewords of
+ *                 length "i" (i.e. codewords represented on "i" bits)
+ *      o VALS[] - is the list of symbol values that will be associated with Huffman
+ *                 codewords (i.e. the symbols that are to be encoded with Huffman codewords).
+ *                 IMPORTANT: the symbol values are placed in this list in order of increasing
+ *                 code length! Codeword lengths greater than 16 bits are not allowed.
+ *
+ * The JPEG standard describes on pages 50-53 algorithms for obtaining a Huffman codeword
+ * table out of the corresponding BITS and VALS vectors.
+ */
 public class HuffmanEncoder {
-    /*
-     * JPEG entropy encoding of an 8x8 block works in the following way:
-     * 1. The DC coefficient is predictively encoded (i.e. the current DC is predicted
-     * from the DC of the previous block) as:
-     *          (SIZE), (AMPLITUDE)
-     * where AMPLITUDE is the differential DC value (i.e. current DC minus the DC of
-     * the previous block) represented in binary on a variable (minimum) number of bits
-     * and SIZE is the Huffman codeword for the number of bits used in the AMPLITUDE binary
-     * representation (i.e. so the actual size/length in bits of the AMPLITUDE is the
-     * symbol and we encode it as a Huffman codeword).
-     *
-     * 2. A single runlength of AC coefficients (RUN, AMPLITUDE) is encoded in the
-     * following way:
-     *          (RUN,SIZE), (AMPLITUDE)
-     * where similarly as for DC, the AMPLITUDE is the actual value of the current non
-     * zero AC coefficient represented in binary on a variable (minimum) number of bits,
-     * RUN is the runlength (i.e. number of consecutive zeroes before this AC coefficient)
-     * and SIZE is the number of bits used in the AMPLITUDE binary representation. The
-     * (RUN, SIZE) pair is encoded as a variable bit Huffman codeword.
-     *
-     * The Huffman codewords for the (SIZE) symbol in DC coefficient representation and the
-     * (RUN, SIZE) pair in the non-zero AC coefficient representation can be computed on
-     * the fly by the JPEG encoder or the encoder can use the standard ones described in
-     * the JPEG standard on pages 149-157. The JPEG standard describes 4 tables of Huffman
-     * codewords:
-     *      o for the luminance DC coefficients
-     *      o for the chrominance DC coefficients
-     *      o for the luminance AC coefficients
-     *      o for the chrominance AC coefficients
-     *
-     * The JPEG standard computes each standard table of Huffman codewords (i.e. each of
-     * those 4 standard Huffman tables mentioned above: luma DC, chroma DC, luma AC, chroma
-     * AC) out of 2 vectors:
-     *      o BITS[] - is a list of numbers/counts of Huffman codewords with a specific length
-     *                 (in number of bits); BITS[i] is the number of Huffman codewords of
-     *                 length "i" (i.e. codewords represented on "i" bits)
-     *      o VALS[] - is the list of symbol values that will be associated with Huffman
-     *                 codewords (i.e. the symbols that are to be encoded with Huffman codewords).
-     *                 IMPORTANT: the symbol values are placed in this list in order of increasing
-     *                 code length! Codeword lengths greater than 16 bits are not allowed.
-     *
-     * The JPEG standard describes on pages 50-53 algorithms for obtaining a Huffman codeword
-     * table out of the corresponding BITS and VALS vectors.
-     */
-
     /* The following fields are used by the Huffman encoder */
 
-    /**
+    /**\
      * The following are lists of numbers of Huffman codewords with a specific length
      * (in number of bits). So, for example, BITS_DC_LUMINANCE[i] is the number of
      * Huffman codewords of length "i" (i.e. codewords represented on "i" bits). The
@@ -70,7 +69,7 @@ public class HuffmanEncoder {
     public static final int[] BITS_AC_CHROMINANCE = {0x11,0,2,1,2,4,4,3,4,7,5,4,4,0,1,2,0x77};
 
 
-    /**
+    /*
      * The following are lists of symbol values that will be associated with Huffman
      * codewords (i.e. the symbols that are to be encoded with Huffman codewords).
      * IMPORTANT: the symbol values are placed in these lists in order of increasing
@@ -185,38 +184,54 @@ public class HuffmanEncoder {
         //printHuffmanTables();
     }
 
-    public void initializeHuffmanTables(int bits_dc_luminance[], int bits_dc_chrominance[],
-                                        int bits_ac_luminance[], int bits_ac_chrominance[],
-                                        int vals_dc_luminance[], int vals_dc_chrominance[],
-                                        int vals_ac_luminance[], int vals_ac_chrominance[]) {
+    public void initializeHuffmanTables(int[] bits_dc_luminance, int[] bits_dc_chrominance,
+                                        int[] bits_ac_luminance, int[] bits_ac_chrominance,
+                                        int[] vals_dc_luminance, int[] vals_dc_chrominance,
+                                        int[] vals_ac_luminance, int[] vals_ac_chrominance) {
         DCLumaHuffmanTable = createHuffmanTable(bits_dc_luminance, vals_dc_luminance, true);
         DCChromaHuffmanTable = createHuffmanTable(bits_dc_chrominance, vals_dc_chrominance, true);
         ACLumaHuffmanTable = createHuffmanTable(bits_ac_luminance, vals_ac_luminance, false);
         ACChromaHuffmanTable = createHuffmanTable(bits_ac_chrominance, vals_ac_chrominance, false);
 
         System.out.print("\nBITS_DC_LUMINANCE: ");
-        for(int i=0; i<bits_dc_luminance.length; i++) { System.out.print(bits_dc_luminance[i]+", "); }
+        for (int j : bits_dc_luminance) {
+            System.out.print(j + ", ");
+        }
         System.out.print("\nBITS_DC_CHROMINANCE: ");
-        for(int i=0; i<bits_dc_chrominance.length; i++) { System.out.print(bits_dc_chrominance[i]+", "); }
+        for (int j : bits_dc_chrominance) {
+            System.out.print(j + ", ");
+        }
         System.out.print("\nBITS_AC_LUMINANCE: ");
-        for(int i=0; i<bits_ac_luminance.length; i++) { System.out.print(bits_ac_luminance[i]+", "); }
+        for (int j : bits_ac_luminance) {
+            System.out.print(j + ", ");
+        }
         System.out.print("\nBITS_AC_CHROMINANCE: ");
-        for(int i=0; i<bits_ac_chrominance.length; i++) { System.out.print(bits_ac_chrominance[i]+", "); }
+        for (int j : bits_ac_chrominance) {
+            System.out.print(j + ", ");
+        }
 
         System.out.print("\nVALS_DC_LUMINANCE: ");
-        for(int i=0; i<vals_dc_luminance.length; i++) { System.out.print(vals_dc_luminance[i]+", "); }
+        for (int j : vals_dc_luminance) {
+            System.out.print(j + ", ");
+        }
         System.out.print("\nVALS_DC_CHROMINANCE: ");
-        for(int i=0; i<vals_dc_chrominance.length; i++) { System.out.print(vals_dc_chrominance[i]+", "); }
+        for (int j : vals_dc_chrominance) {
+            System.out.print(j + ", ");
+        }
         System.out.print("\nVALS_AC_LUMINANCE: ");
-        for(int i=0; i<vals_ac_luminance.length; i++) { System.out.print(vals_ac_luminance[i]+", "); }
+        for (int j : vals_ac_luminance) {
+            System.out.print(j + ", ");
+        }
         System.out.print("\nVALS_AC_CHROMINANCE: ");
-        for(int i=0; i<vals_ac_chrominance.length; i++) { System.out.print(vals_ac_chrominance[i]+", "); }
+        for (int j : vals_ac_chrominance) {
+            System.out.print(j + ", ");
+        }
         System.out.println();
 
         printHuffmanTables();
     }
 
-    private int[][] createHuffmanTable(int bits[], int vals[], boolean DCtable) {
+    private int[][] createHuffmanTable(int[] bits, int[] vals, boolean DCtable) {
         // this is the implementation of algorithms from pages 50-53 in the JPEG standards
         int i, j, k;
         int lastk, si, code;
@@ -295,17 +310,12 @@ public class HuffmanEncoder {
 
         System.out.print("        	A MCU contains the following blocks in this order: ");
         for (int i=0; i<3; i++) {
-            char blocktype = ' ';
-            switch(i) {
-                case 0:
-                    blocktype = 'Y';
-                    break;
-                case 1:
-                    blocktype = 'U';
-                    break;
-                case 2:
-                    blocktype = 'V';
-            }
+            char blocktype = switch (i) {
+                case 0 -> 'Y';
+                case 1 -> 'U';
+                case 2 -> 'V';
+                default -> ' ';
+            };
             for (int j=0; j<horizontalSamplingFactors[i]*verticalSamplingFactors[i]; j++) {
                 System.out.print(blocktype + ", ");
             }
@@ -317,18 +327,16 @@ public class HuffmanEncoder {
         int[][] DCHuffmanTable;
         int[][] ACHuffmanTable;
 
-        switch(block.getType()) {
-            case 'Y' :
+        switch (block.getType()) {
+            case 'Y' -> {
                 DCHuffmanTable = DCLumaHuffmanTable;
                 ACHuffmanTable = ACLumaHuffmanTable;
-                break;
-            case 'U' :
-            case 'V' :
+            }
+            case 'U', 'V' -> {
                 DCHuffmanTable = DCChromaHuffmanTable;
                 ACHuffmanTable = ACChromaHuffmanTable;
-                break;
-            default :
-                throw new IllegalArgumentException("HuffmanEncoder - Illegal RunLength block type.");
+            }
+            default -> throw new IllegalArgumentException("HuffmanEncoder - Illegal RunLength block type.");
         }
         // encode the DC coefficient first
         RunLength rlElem = block.getData().get(0);
@@ -392,20 +400,19 @@ public class HuffmanEncoder {
         prewriteBuffer = prewriteBuffer |  (codeword << (32-bitcount-nbits));
         bitcount += nbits;
 
-        while (bitcount>=8) {
-            int c = ((prewriteBuffer >> 24) & 0xff); // get the MSB (Most Significant Byte)
-            outputStream.write(c);
-            if (c == 0xff)
-                // 0xff is a segment prefix, so if it appears in the pixels bitstream,
-                // it must be immediately followed by a 0x00 byte.
-                outputStream.write(0);
-            prewriteBuffer <<= 8;
-            bitcount -= 8;
-        }
+        writeBuffer(outputStream);
 
     }
 
     public void flushBuffer(BufferedOutputStream outputStream) throws IOException {
+        writeBuffer(outputStream);
+        if (bitcount > 0) {
+            int c = ((prewriteBuffer >> 24) & 0xff); // get the MSB (Most Significant Byte)
+            outputStream.write(c);
+        }
+    }
+
+    private void writeBuffer(BufferedOutputStream outputStream) throws IOException {
         while (bitcount >= 8) {
             int c = ((prewriteBuffer >> 24) & 0xff); // get the MSB (Most Significant Byte)
             outputStream.write(c);
@@ -415,10 +422,6 @@ public class HuffmanEncoder {
                 outputStream.write(0);
             prewriteBuffer <<= 8;
             bitcount -= 8;
-        }
-        if (bitcount > 0) {
-            int c = ((prewriteBuffer >> 24) & 0xff); // get the MSB (Most Significant Byte)
-            outputStream.write(c);
         }
     }
 
@@ -432,7 +435,7 @@ public class HuffmanEncoder {
      * @height - height of the image
      */
     public ArrayList<RunLengthBlock> decode(byte[] encodedBitstream, int sampling, int width, int height) {
-        ArrayList<RunLengthBlock> rleBlocksArray = new ArrayList<RunLengthBlock>();
+        ArrayList<RunLengthBlock> rleBlocksArray = new ArrayList<>();
         noOfBitsLeftInCurrentByte = 8;  // the number of bits that are left (i.e. not consumed) in the current
                                         // byte of the `encodedBitstream` (i.e. encodedBitstream[i]);
                                         // these bits are always saved starting with the most-significant-bit
@@ -470,7 +473,7 @@ public class HuffmanEncoder {
             }
             System.out.println("idxCurrentByte= " + idxCurrentByte);
             RunLengthBlock rleBlock = new RunLengthBlock();
-            rleBlock.setType(getNextDecodedBlockType(sampling));
+            rleBlock.setType(getNextDecodedBlockType());
             decodeBlock(encodedBitstream, rleBlock);
             rleBlocksArray.add(rleBlock);
             System.out.println("HuffmanEncoder::decode() decoded block " + i + " of type " + rleBlock.getType() +
@@ -537,14 +540,13 @@ public class HuffmanEncoder {
         // first, let's select the appropriate Huffman table that we will be using for decoding
         int[][] huffmanTable = DCLumaHuffmanTable;
         switch (HuffmanTableType) {
-            case 'Y':
-                if (isDC==true) huffmanTable = DCLumaHuffmanTable;
-                else huffmanTable = ACLumaHuffmanTable;
-                break;
-            case 'U':
-            case 'V':
-                if (isDC==true) huffmanTable = DCChromaHuffmanTable;
+            case 'Y' -> {
+                if (!isDC) huffmanTable = ACLumaHuffmanTable;
+            }
+            case 'U', 'V' -> {
+                if (isDC) huffmanTable = DCChromaHuffmanTable;
                 else huffmanTable = ACChromaHuffmanTable;
+            }
         }
         System.out.println("HuffmanEncoder::decodeHuffmanCodeword() using Huffman table " +
                 isDC + " " + HuffmanTableType);
@@ -586,19 +588,7 @@ public class HuffmanEncoder {
 
             //System.out.println("idxCurrentByte=" + idxCurrentByte +
             //        " noOfBitsLeftInCurrentByte=" + noOfBitsLeftInCurrentByte);
-            if (noOfBitsLeftInCurrentByte == 0) { // move to the following byte in encodedBitstream
-                idxCurrentByte++;
-                noOfBitsLeftInCurrentByte = 8;
-                // if we have 0xff followed by 0x00 in the encoded byte stream, we ignore the 0x00 byte
-                if ((previousByte==0xff) && (idxCurrentByte<encodedBitstream.length) &&
-                        (encodedBitstream[idxCurrentByte]==0x00)) {
-                    idxCurrentByte++;
-                }
-                if (idxCurrentByte<encodedBitstream.length) {
-                    previousByte = encodedBitstream[idxCurrentByte] & 0xff;
-                    System.out.println("current decoding byte is: " + getBinary(encodedBitstream[idxCurrentByte], 8));
-                }
-            }
+            decodeByte(encodedBitstream);
             if (symbol != -1) {
                 // codeword found in Huffman tables
                 System.out.println("codeword="+getBinary(codeBuffer,codeBufferSize) +
@@ -607,6 +597,22 @@ public class HuffmanEncoder {
             }
         }
         return symbol;
+    }
+
+    private void decodeByte(byte[] encodedBitstream) {
+        if (noOfBitsLeftInCurrentByte == 0) { // move to the following byte in encodedBitstream
+            idxCurrentByte++;
+            noOfBitsLeftInCurrentByte = 8;
+            // if we have 0xff followed by 0x00 in the encoded byte stream, we ignore the 0x00 byte
+            if ((previousByte==0xff) && (idxCurrentByte<encodedBitstream.length) &&
+                    (encodedBitstream[idxCurrentByte]==0x00)) {
+                idxCurrentByte++;
+            }
+            if (idxCurrentByte<encodedBitstream.length) {
+                previousByte = encodedBitstream[idxCurrentByte] & 0xff;
+                System.out.println("current decoding byte is: " + getBinary(encodedBitstream[idxCurrentByte], 8));
+            }
+        }
     }
 
     // Find the symbol from the `HuffmanTable` encoded with that specific `codeword`
@@ -656,19 +662,7 @@ public class HuffmanEncoder {
                 encodedBitstream[idxCurrentByte] <<= 1;
                 noOfBitsLeftInCurrentByte--;
 
-                if (noOfBitsLeftInCurrentByte == 0) { // move to the following byte in encodedBitstream
-                    idxCurrentByte++;
-                    noOfBitsLeftInCurrentByte = 8;
-                    // if we have 0xff followed by 0x00 in the encoded byte stream, we ignore the 0x00 byte
-                    if ((previousByte == 0xff) && (idxCurrentByte < encodedBitstream.length) &&
-                            (encodedBitstream[idxCurrentByte] == 0x00)) {
-                        idxCurrentByte++;
-                    }
-                    if (idxCurrentByte<encodedBitstream.length) {
-                        previousByte = encodedBitstream[idxCurrentByte] & 0xff;
-                        System.out.println("current decoding byte is: " + getBinary(encodedBitstream[idxCurrentByte], 8));
-                    }
-                }
+            decodeByte(encodedBitstream);
         }
 
         if (firstbit==0) {
@@ -684,7 +678,7 @@ public class HuffmanEncoder {
         return amplitude;
     }
 
-    private char getNextDecodedBlockType(int sampling) {
+    private char getNextDecodedBlockType() {
         /* This function returns the type (Y, U or V) of the next decoded block from the
          * encoded bitstream based on the horizontal sampling factor and vertival sampling
          * factor for each component as specified in the JPG file. The order of blocks
@@ -708,7 +702,7 @@ public class HuffmanEncoder {
 
         currentBlockTypeIdx++;
         currentBlockTypeIdx = currentBlockTypeIdx % noBlocksInMCU;
-        char blocktype = ' ';
+        char blocktype;
 
         if (currentBlockTypeIdx < horizontalSamplingFactors[0]*verticalSamplingFactors[0]) {
             blocktype = 'Y';
