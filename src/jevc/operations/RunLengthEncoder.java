@@ -5,6 +5,7 @@ import jevc.entities.RunLength;
 import jevc.entities.RunLengthBlock;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 
 public class RunLengthEncoder {
     private final int[] lastDCvalues = {0, 0, 0}; // [0] - last Y value; [1] - last Cb value; [2] - last Cr value
@@ -39,6 +40,7 @@ public class RunLengthEncoder {
             // will be encoded as a part of a runlength of another non-zero AC coefficient.
             size = 0;
         }
+
         RunLength rlElem = new RunLength(-1, size, amplitude);
         runlengthElements.add(rlElem);
 

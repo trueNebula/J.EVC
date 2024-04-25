@@ -729,7 +729,7 @@ public class YCbCrImage {
             localWidth /= 2;
         }
 
-        System.out.println("blocktype " + type + " localHeight=" + localHeight + " localWidth= " + localWidth);
+//        System.out.println("blocktype " + type + " localHeight=" + localHeight + " localWidth= " + localWidth);
         for(int i=0; i<localHeight; i+=Block.BLOCKSIZE) {
             for (int j = 0; j < localWidth; j += Block.BLOCKSIZE) {
                 int[][] data = new int[Block.BLOCKSIZE][Block.BLOCKSIZE];

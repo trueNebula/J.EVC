@@ -342,8 +342,8 @@ public class HuffmanEncoder {
         RunLength rlElem = block.getData().get(0);
         // write the huffman code for (Size)
         writeToStream(outputStream, DCHuffmanTable[rlElem.getSize()][0], DCHuffmanTable[rlElem.getSize()][1]);
-        System.out.println("Write DCSize in outputstream: " + getBinary(DCHuffmanTable[rlElem.getSize()][0],
-                DCHuffmanTable[rlElem.getSize()][1]));
+//        System.out.println("Write DCSize in outputstream: " + getBinary(DCHuffmanTable[rlElem.getSize()][0],
+//                DCHuffmanTable[rlElem.getSize()][1]));
         // write the binary value of amplitude; if amplitude>=0, write it binary;
         // if amplitude<0 write amplitude-1 and without the sign bit
         int amplitude = rlElem.getAmplitude();
@@ -351,8 +351,8 @@ public class HuffmanEncoder {
             amplitude = amplitude -1;
         }
         writeToStream(outputStream, amplitude, rlElem.getSize());
-        System.out.println("Write DCAmplitude in outputstream: " + getBinary(amplitude,
-                rlElem.getSize()));
+//        System.out.println("Write DCAmplitude in outputstream: " + getBinary(amplitude,
+//                rlElem.getSize()));
 
         // encode the AC run lengths elements
         for (int i=1; i<block.getSize(); i++) {
@@ -363,23 +363,23 @@ public class HuffmanEncoder {
             while (run > 15) {
                 // store Huffman code for a run of 16 zeroes
                 writeToStream(outputStream, ACHuffmanTable[0xF0][0],ACHuffmanTable[0xF0][1]);
-                System.out.println("Write ZRL in outputstream: " + getBinary(ACHuffmanTable[0xF0][0],
-                        ACHuffmanTable[0xF0][1]));
+//                System.out.println("Write ZRL in outputstream: " + getBinary(ACHuffmanTable[0xF0][0],
+//                        ACHuffmanTable[0xF0][1]));
                 run -= 16;
             }
             int tableIndex = (run << 4) + size;
             // write the huffman code of (Run,Size)
             writeToStream(outputStream, ACHuffmanTable[tableIndex][0],ACHuffmanTable[tableIndex][1]);
-            System.out.println("Write (Run,Size) in outputstream: " + getBinary(ACHuffmanTable[tableIndex][0],
-                    ACHuffmanTable[tableIndex][1]));
+//            System.out.println("Write (Run,Size) in outputstream: " + getBinary(ACHuffmanTable[tableIndex][0],
+//                    ACHuffmanTable[tableIndex][1]));
             // write the binary value of amplitude (only if current elem is not End-Of-Block)
             if ((i<block.getSize()-1) || (run!=0 && size!=0 && amplitude!=0)) {
                 if (amplitude<0) {
                     amplitude = amplitude -1;
                 }
                 writeToStream(outputStream, amplitude, size);
-                System.out.println("Write ACAmplitude in outputstream: " + getBinary(amplitude,
-                        size));
+//                System.out.println("Write ACAmplitude in outputstream: " + getBinary(amplitude,
+//                        size));
             }
 
         }

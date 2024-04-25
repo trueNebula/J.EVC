@@ -132,13 +132,13 @@ public class JPEGDecoderService extends JPEGHeader {
             int[] pos = computeNextBlockPosition(block.getType());
             block.setPos(pos[0], pos[1]);
             System.out.println("Quantized block:");
-            block.print();
+//            block.print();
             quantizer.dequantize(block);
             System.out.println("DCT block:");
-            block.print();
+//            block.print();
             DCT.inverse(block);
             System.out.println("YCbCr block:");
-            block.print();
+//            block.print();
             blocks.add(block);
             i++;
         }

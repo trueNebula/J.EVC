@@ -73,19 +73,29 @@ public class JPEGEncoderService {
         writeHeaderSections(outputStream);
 
         for (Block block: blocks) {
-            System.out.println("YCbCr block:");
-            block.print();
+            boolean enablePrint = blocks.indexOf(block) == 0;
+
+            if (enablePrint) {
+                System.out.println("YCbCr block:");
+                block.print();
+            }
             DebugColorBlocks.add(block.getCopy());
             DCT.forward(block);
-            System.out.println("DCT block:");
-            block.print();
+            if (enablePrint) {
+                System.out.println("DCT block:");
+                block.print();
+            }
             DebugDCTBlocks.add(block.getCopy());
             quantizer.quantize(block);
-            System.out.println("Quantized block:");
-            block.print();
+            if (enablePrint) {
+                System.out.println("Quantized block:");
+                block.print();
+            }
             DebugQBlocks.add(block.getCopy());
             rleBlock = runlengthEncoder.encode(block);
-            rleBlock.print();
+            if (enablePrint) {
+                rleBlock.print();
+            }
             huffmanEncoder.encode(outputStream, rleBlock);
         }
         huffmanEncoder.flushBuffer(outputStream);
