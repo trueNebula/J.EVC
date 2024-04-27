@@ -1,12 +1,10 @@
 package jevc.service;
 
 import jevc.entities.Block;
+import jevc.entities.ExponentialGolombBlock;
 import jevc.entities.RunLengthBlock;
 import jevc.entities.YCbCrImage;
-import jevc.operations.DiscreteCosineTransform;
-import jevc.operations.HuffmanEncoder;
-import jevc.operations.Quantizer;
-import jevc.operations.RunLengthEncoder;
+import jevc.operations.*;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -45,6 +43,9 @@ public class mJpegEncoderService {
     private final Quantizer quantizer;
     private RunLengthEncoder runlengthEncoder;
     private HuffmanEncoder huffmanEncoder;
+    private ExponentialGolombEncoder exponentialGolombEncoder;
+    private BlockBuffer blockBuffer;
+    private MotionEstimator motionEstimator;
     private BufferedOutputStream outputStream;
     private final String outputFolder;
 
@@ -62,12 +63,25 @@ public class mJpegEncoderService {
     }
 
     public void compress() throws IOException {
-//        System.setOut(new PrintStream(new BufferedOutputStream(new FileOutputStream("log.txt"))));
+        System.setOut(new PrintStream(new BufferedOutputStream(new FileOutputStream("log.txt"))));
+        int frameIndex = 0;
         for (File f: this.files) {
+            // set Frame type
+            char frameType = 'P';
+            if (frameIndex % 10 == 0) {
+                frameType = 'I';
+            }
+            frameType = 'I';
+            frameIndex++;
+
+            // init encoders
             runlengthEncoder = new RunLengthEncoder();
             huffmanEncoder = new HuffmanEncoder();
+            exponentialGolombEncoder = new ExponentialGolombEncoder();
+            blockBuffer = new BlockBuffer();
             System.out.println(f.getName());
 
+            // read image and convert to YCbCr
             BufferedImage img = ImageIO.read(f);
             int[][] pixels = new int[img.getHeight()][img.getWidth()];
 
@@ -80,77 +94,98 @@ public class mJpegEncoderService {
             BufferedOutputStream frameOutputStream = new BufferedOutputStream(
                     new FileOutputStream(outputFolder + f.getName().replace(".png", ".jpg"))
             );
+
+            // scale and subsample image
             frame.ScaleImage();
             //image.PerformSubsampling(YCbCrImage.YUV411Sampling);
             frame.PerformSubsampling(YCbCrImage.YUV444Sampling);
+
+            // split frame into blocks
             ArrayList<Block> blocks = frame.PerformBlockSplitting();
 //            System.out.println(Arrays.deepToString(blocks.get(0).getData()));
             RunLengthBlock rleBlock;
+            ExponentialGolombBlock egBlock;
             ArrayList<Block> DebugColorBlocks = new ArrayList<>();
             ArrayList<Block> DebugDCTBlocks = new ArrayList<>();
             ArrayList<Block> DebugQBlocks = new ArrayList<>();
 
+            // write JPEG header sections (REMOVE THIS)
             writeHeaderSections(frameOutputStream, frame);
 
+            // process each block
             for (Block block: blocks) {
-                boolean enablePrint = false;
+                boolean enablePrint = true;
 
-                if (enablePrint) {
-                    System.out.println("YCbCr block:");
-                    block.print();
-                }
-                DebugColorBlocks.add(block.getCopy());
-                DCT.forward(block);
-                if (enablePrint) {
-                    System.out.println("DCT block:");
-                    block.print();
-                }
-                DebugDCTBlocks.add(block.getCopy());
-                quantizer.quantize(block);
-                if (enablePrint) {
-                    System.out.println("Quantized block:");
-                    block.print();
-                }
-                // TODO:
-                // set frame type (I or P)
-                // if I:
-                // dequant and dedct a given block
-                // save it in a block buffer
-                // proceed to VLC
-                // if P:
-                // skip to motion estimation
-                // look through block buffer for the most similar block
-                // compute motion vector
-                // subtract found block from input block
-                // send input block through regular compression
-                // write to buffer
-                // send motion vector to VLC
-                // write to buffer
+                // I frame => perform DCT, quantization, inverses, push to buffer, proceed to VLC
+                // P frame => search in block buffer, estimate motion, subtract, perform DCT, quantization,
+                //            proceed to VLC
+                if (frameType == 'P') {
+                    motionEstimator = new MotionEstimator();
+                    // skip to motion estimation
+                    // look through block buffer for the most similar block
+                    Block similarBlock = blockBuffer.getSimilarBlock(block);
+                    // compute motion vector
+//                    int[] motionVector = motionEstimator.computeMotionVector(block, similarBlock);
+                    // subtract found block from input block
+                    block.subtract(similarBlock);
+                    // perform DCT
+                    DCT.forward(block);
+                    // quantize DCT coefficients
+                    quantizer.quantize(block);
+                    // write to buffer
+                    // send motion vector to VLC
 
-                DebugQBlocks.add(block.getCopy());
-                rleBlock = runlengthEncoder.encode(block);
-                if (enablePrint) {
-                    rleBlock.print();
+                    // write to buffer
+                } else if (frameType == 'I'){
+                    if (enablePrint) {
+                        System.out.println("YCbCr block:");
+                        block.print();
+                    }
+                    DebugColorBlocks.add(block.getCopy());
+
+                    // perform DCT
+                    DCT.forward(block);
+                    if (enablePrint) {
+                        System.out.println("DCT block:");
+                        block.print();
+                    }
+                    DebugDCTBlocks.add(block.getCopy());
+
+                    // quantize DCT coefficients
+                    quantizer.quantize(block);
+                    if (enablePrint) {
+                        System.out.println("Quantized block:");
+                        block.print();
+                    }
+                    DebugQBlocks.add(block.getCopy());
+
+                    // inverse quantize and inverse DCT a given block
+                    Block savedBlock = block.getCopy();
+                    quantizer.dequantize(savedBlock);
+                    DCT.inverse(savedBlock);
+
+                    // save it in a block buffer
+                    blockBuffer.save(savedBlock);
+                    // proceed to VLC
                 }
-                huffmanEncoder.encode(frameOutputStream, rleBlock);
+
+                // VLC encode block
+//                rleBlock = runlengthEncoder.encode(block);
+                egBlock = exponentialGolombEncoder.encodeBlock(block);
+                if (enablePrint) {
+                    egBlock.print();
+                }
+//                huffmanEncoder.encode(frameOutputStream, rleBlock);
+                outputStream.write(egBlock.toString().getBytes());
             }
-            huffmanEncoder.flushBuffer(frameOutputStream);
 
+            // flush buffers
+            huffmanEncoder.flushBuffer(frameOutputStream);
+            blockBuffer.flush();
+
+            // write JPEG trailer section (REMOVE THIS)
             writeTrailerSection(frameOutputStream);
         }
-
-        // Debuging : dump images with the DCT coefficients and quantized DCT coefficients
-        /*if (image.getSampling()==YCbCrImage.YUV444Sampling) {
-            YCbCrImage Pixelimage = new YCbCrImage(image.getHeight(), image.getWidth(), image.getSampling());
-            Pixelimage.FromBlocks(DebugColorBlocks, image.getSampling());
-            Pixelimage.writePNGFile("DebugColorPixels");
-            YCbCrImage DCTimage = new YCbCrImage(image.getHeight(), image.getWidth(), image.getSampling());
-            DCTimage.FromBlocks(DebugDCTBlocks, image.getSampling());
-            DCTimage.writePNGFile("DebugDCTcoefficients");
-            YCbCrImage Qimage = new YCbCrImage(image.getHeight(), image.getWidth(), image.getSampling());
-            Qimage.FromBlocks(DebugQBlocks, image.getSampling());
-            Qimage.writePNGFile("DebugQcoefficients");
-        }*/
     }
 
     private void writeHeaderSections(BufferedOutputStream outputStream, YCbCrImage frame) throws IOException {
