@@ -18,17 +18,17 @@ public class AVIHeader {
     private final EXBMINFOHEADER strf;
     private final DWORD ddww;
     private final DWORD szs;
-    private final DWORD totalFrames;
+    private DWORD totalFrames;
     private final LIST movi;
 
-    private final int fps = 1;
+    private final int fps = 10;
     private final int bytesPerSec = 7000;
     private ArrayList<Integer> frameLengthBuffer;
 
-    public AVIHeader(int frameCount, int length, DWORD width, DWORD height) {
+    public AVIHeader() {
         riff = new RIFF(
                 new DWORD("RIFF"),
-                getRiffSize(frameCount, length),
+                new DWORD(-1),
                 new DWORD("AVI ")
         );
         hdrl = new LIST(
@@ -43,12 +43,12 @@ public class AVIHeader {
                 new DWORD(bytesPerSec),
                 new DWORD(0),
                 new DWORD(16),
-                new DWORD(frameCount),
+                new DWORD(-1),
                 new DWORD(0),
                 new DWORD(1),
                 new DWORD(0),
-                width,
-                height,
+                new DWORD(-1),
+                new DWORD(-1),
                 new DWORD[]{
                         new DWORD(0),
                         new DWORD(0),
@@ -73,27 +73,27 @@ public class AVIHeader {
                 new DWORD(1),
                 new DWORD(fps),
                 new DWORD(0),
-                new DWORD(frameCount),
+                new DWORD(-1),
                 new DWORD(0),
                 new DWORD(0),
                 new DWORD(0),
                 new RECT(
                         new DWORD(0),
                         new DWORD(0),
-                        width,
-                        height
+                        new DWORD(-1),
+                        new DWORD(-1)
                 )
         );
         strf = new EXBMINFOHEADER(
                 new DWORD("strf"),
                 new DWORD(40),
                 new DWORD(40),
-                width,
-                height,
+                new DWORD(-1),
+                new DWORD(-1),
                 new WORD((short) 1),
                 new WORD((short) 24),
                 new DWORD("MJPG"),
-                new DWORD(getStrfImageSize(width, height, 24)),
+                new DWORD(-1),
                 new DWORD(0),
                 new DWORD(0),
                 new DWORD(0),
@@ -101,16 +101,32 @@ public class AVIHeader {
         );
         movi = new LIST(
                 new DWORD("LIST"),
-                getMoviSize(frameCount, length),
+                new DWORD(-1),
                 new DWORD("movi")
         );
         ddww = new DWORD(16);
         szs = new DWORD(4);
-        totalFrames = new DWORD(frameCount);
         frameLengthBuffer = new ArrayList<>();
     }
 
-    public void writeAVIHeader(BufferedOutputStream outputStream) throws IOException {
+    public void writeAVIHeader(int frameCount, DWORD width, DWORD height, BufferedOutputStream outputStream) throws IOException {
+        // get total length
+        int length = frameLengthBuffer.stream().reduce(0, Integer::sum);
+        System.out.println(length);
+        // fill in missing atoms
+        riff.dwSize = getRiffSize(frameCount, length);
+        avih.dwTotalFrames = new DWORD(frameCount);
+        avih.dwWidth = width;
+        avih.dwHeight = height;
+        strh.dwLength = new DWORD(frameCount);
+        strh.rcFrame.bottom = height;
+        strh.rcFrame.right = width;
+        strf.biWidth = width;
+        strf.biHeight = height;
+        strf.biSizeImage = new DWORD(getStrfImageSize(width, height, 24));
+        movi.dwSize = getMoviSize(frameCount, length);
+        totalFrames = new DWORD(frameCount);
+
         // Write RIFF atom
         outputStream.write(riff.dwRIFF.byteValue());
         outputStream.write(riff.dwSize.byteValue());
@@ -202,7 +218,13 @@ public class AVIHeader {
                 new DWORD(buffer.size())
         );
 
-        frameLengthBuffer.add(buffer.size());
+
+        int frameLength = buffer.size();
+        if (frameLength % 2 != 0) {
+            frameLength++;
+        }
+
+        frameLengthBuffer.add(frameLength);
 
         outputStream.write(data.dwFourCc.byteValue());
         outputStream.write(data.dwSize.byteValue());

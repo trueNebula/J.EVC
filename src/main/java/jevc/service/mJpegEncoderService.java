@@ -8,6 +8,7 @@ import jevc.utils.AVIHeader;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.*;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Vector;
 
@@ -46,6 +47,7 @@ public class mJpegEncoderService {
     private BlockBuffer blockBuffer;
     private MotionEstimator motionEstimator;
     private BufferedOutputStream outputStream;
+    private BufferedOutputStream tempOutputStream;
     private AVIHeader aviHeader;
     private final String outputFolder;
     private final String outputFile;
@@ -57,6 +59,7 @@ public class mJpegEncoderService {
         this.outputFolder = outputFolder;
         this.outputFile = outfile;
         this.internalFrameBuffer = new InternalFrameBuffer();
+        this.aviHeader = new AVIHeader();
         initProgressStatus();
 
         DCT = new DiscreteCosineTransform();
@@ -64,6 +67,9 @@ public class mJpegEncoderService {
         quantizer = new Quantizer(DEFAULT_QUALITY_FACTOR);
         try {
             outputStream = new BufferedOutputStream(new FileOutputStream(outfile));
+            tempOutputStream = new BufferedOutputStream(
+                    new FileOutputStream(outputFolder + "temp/temp")
+            );
         } catch (Exception ex) {
             System.out.println("Error opening the output stream!");
         }
@@ -72,32 +78,27 @@ public class mJpegEncoderService {
     public void compress() throws IOException {
 //        System.setOut(new PrintStream(new BufferedOutputStream(new FileOutputStream("log.txt"))));
         System.out.println("Starting encoding");
-        DWORD videoWidth;
-        DWORD videoHeight;
 
-        // read the first file and get its size
-        BufferedImage img = ImageIO.read(files[0]);
-        videoWidth = new DWORD(img.getWidth());
-        videoHeight = new DWORD(img.getHeight() + 8);
+        DWORD videoWidth = new DWORD(0);
+        DWORD videoHeight = new DWORD(0);
+        BufferedImage img;
 
-        File temp = new File(outputFolder + "temp/temp.jpg");
-        int length;
-
-        if (!(temp.exists() && temp.isFile())) {
-            System.out.println("Got first frame, starting pre encoding");
-            length = preEncodeFrame(img);
-        } else {
-            System.out.println("Found pre encoded frame, skipping this step!");
-            length = (int) temp.length();
-        }
-        System.out.println("length = " + length);
-        System.out.println("Writing avi header");
-        aviHeader = new AVIHeader(this.files.length, length, videoWidth, videoHeight);
-        aviHeader.writeAVIHeader(outputStream);
-        outputStream.flush();
-
-        System.out.println("Avi header written, writing frames");
-        System.out.println("Output file: " + outputFile);
+        // we no longer need these
+        // // read the first file and get its size
+        // BufferedImage img = ImageIO.read(files[0]);
+        // videoWidth = new DWORD(img.getWidth());
+        // videoHeight = new DWORD(img.getHeight() + 8);
+        //
+        // File temp = new File(outputFolder + "temp/temp.jpg");
+        // int length;
+        //
+        // if (!(temp.exists() && temp.isFile())) {
+        //     System.out.println("Got first frame, starting pre encoding");
+        //     length = preEncodeFrame(img);
+        // } else {
+        //     System.out.println("Found pre encoded frame, skipping this step!");
+        //     length = (int) temp.length();
+        // }
 
         int frameIndex = 0;
         for (File f: this.files) {
@@ -113,6 +114,9 @@ public class mJpegEncoderService {
 
             // read image and convert to YCbCr
             img = ImageIO.read(f);
+            videoWidth = new DWORD(img.getWidth());
+            videoHeight = new DWORD(img.getHeight() + 8);
+
             int[][] pixels = new int[img.getHeight()][img.getWidth()];
 
             for (int i = 0; i < img.getHeight(); i++)
@@ -124,7 +128,20 @@ public class mJpegEncoderService {
             encodeFrameMjpg(frame, frameType, true);
             // encodeFrameMpeg(frame, frameType, true);
         }
+
+
+        System.out.println("Writing avi header");
+        aviHeader.writeAVIHeader(this.files.length, videoWidth, videoHeight, outputStream);
+//        outputStream.flush();
+
+        System.out.println("Avi header written, writing frames");
+        File temp = new File(outputFolder + "temp/temp");
+        Files.copy(temp.toPath(), outputStream);
+
+        System.out.println("Frames written, writing Idx1");
         aviHeader.writeIdx1(outputStream, this.files.length);
+
+        System.out.println("Output file: " + outputFile);
 
     }
 
@@ -165,7 +182,8 @@ public class mJpegEncoderService {
         for (Block block: blocks) {
             blockIndex++;
             if (enablePrint) {
-                updateProgressStatus((int) (10 + ((double) blockIndex / blocks.size() * 100) - 20), "Processing blocks...");
+//                updateProgressStatus((int) (10 + ((double) blockIndex / blocks.size() * 100) - 20), "Processing blocks...");
+                updateProgressStatus((int) ((double) blockIndex / blocks.size() * 100), "Processing blocks...");
             }
 
             // I frame => perform DCT, quantization, inverses, push to buffer, proceed to VLC
@@ -230,7 +248,7 @@ public class mJpegEncoderService {
             huffmanEncoder.encode(internalFrameBuffer, rleBlock);
         }
 
-        updateProgressStatus(90, "Finishing up...");
+//        updateProgressStatus(90, "Finishing up...");
 
         // flush buffers
         huffmanEncoder.flushBuffer(internalFrameBuffer);
@@ -243,7 +261,8 @@ public class mJpegEncoderService {
         writeTrailerSection(internalFrameBuffer);
         updateProgressStatus(100, "Frame finished!");
 
-        aviHeader.writeDataChunk(outputStream, internalFrameBuffer);
+        aviHeader.writeDataChunk(tempOutputStream, internalFrameBuffer);
+        tempOutputStream.flush();
     }
 
     private void encodeFrameMpeg(YCbCrImage frame, char frameType, boolean enablePrint) throws IOException {
