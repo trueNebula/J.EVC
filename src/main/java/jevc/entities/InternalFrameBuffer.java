@@ -37,4 +37,10 @@ public class InternalFrameBuffer {
     public int size() {
         return this.buffer.size();
     }
+
+    public void reset() throws IOException {
+        this.buffer.reset();
+        this.buffer.write(new byte[]{0, 0, 0, 0});
+        this.buffer.reset();
+    }
 }

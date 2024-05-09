@@ -159,7 +159,7 @@ public class HuffmanEncoder {
     private int[][] ACChromaHuffmanTable; // Hufmann codewords and sizes for AC chroma coefficients
 
     /* The following fields are used by the Huffman decoder (i.e. by the decode() method) */
-    private int noOfBitsLeftInCurrentByte;  // the number of bits that are left (i.e. not consumed) in the current
+    public int noOfBitsLeftInCurrentByte;  // the number of bits that are left (i.e. not consumed) in the current
                                     // byte of the `encodedBitstream` (i.e. encodedBitstream[i]);
                                     // these bits are always saved starting with the most-significant-bit
                                     // of encodedBitstream[i];
@@ -417,13 +417,17 @@ public class HuffmanEncoder {
         while (bitcount >= 8) {
             int c = ((prewriteBuffer >> 24) & 0xff); // get the MSB (Most Significant Byte)
             outputStream.write(c);
-            if (c == 0xff)
+//            System.out.print(Integer.toBinaryString(c));
+            if (c == 0xff) {
                 // 0xff is a segment prefix, so if it appears in the pixels bitstream,
                 // it must be immediately followed by a 0x00 byte.
                 outputStream.write(0);
+//                System.out.print(Integer.toBinaryString(0));
+            }
             prewriteBuffer <<= 8;
             bitcount -= 8;
         }
+//        System.out.println();
     }
 
     /* The function decodes a bitstream into a list of RunLength blocks.
@@ -485,7 +489,7 @@ public class HuffmanEncoder {
         return rleBlocksArray;
     }
 
-    private void decodeBlock(byte[] encodedBitstream, RunLengthBlock rleBlock) {
+    public void decodeBlock(byte[] encodedBitstream, RunLengthBlock rleBlock) {
         int sizeDC, runlength, sizeAC, amplitude, x;
 
         if (idxCurrentByte >= encodedBitstream.length) return;

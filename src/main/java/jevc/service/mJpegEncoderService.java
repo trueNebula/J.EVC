@@ -1,9 +1,9 @@
 package jevc.service;
 
-import com.google.common.primitives.UnsignedInteger;
 import jevc.entities.*;
 import jevc.operations.*;
-import jevc.utils.AVIHeader;
+import jevc.utils.AVIWriter;
+import jevc.utils.JVidWriter;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -48,7 +48,8 @@ public class mJpegEncoderService {
     private MotionEstimator motionEstimator;
     private BufferedOutputStream outputStream;
     private BufferedOutputStream tempOutputStream;
-    private AVIHeader aviHeader;
+    private AVIWriter aviWriter;
+    private JVidWriter jVidWriter;
     private final String outputFolder;
     private final String outputFile;
 
@@ -59,7 +60,10 @@ public class mJpegEncoderService {
         this.outputFolder = outputFolder;
         this.outputFile = outfile;
         this.internalFrameBuffer = new InternalFrameBuffer();
-        this.aviHeader = new AVIHeader();
+        this.aviWriter = new AVIWriter();
+        this.jVidWriter = new JVidWriter();
+        this.blockBuffer = new BlockBuffer();
+
         initProgressStatus();
 
         DCT = new DiscreteCosineTransform();
@@ -83,33 +87,15 @@ public class mJpegEncoderService {
         DWORD videoHeight = new DWORD(0);
         BufferedImage img;
 
-        // we no longer need these
-        // // read the first file and get its size
-        // BufferedImage img = ImageIO.read(files[0]);
-        // videoWidth = new DWORD(img.getWidth());
-        // videoHeight = new DWORD(img.getHeight() + 8);
-        //
-        // File temp = new File(outputFolder + "temp/temp.jpg");
-        // int length;
-        //
-        // if (!(temp.exists() && temp.isFile())) {
-        //     System.out.println("Got first frame, starting pre encoding");
-        //     length = preEncodeFrame(img);
-        // } else {
-        //     System.out.println("Found pre encoded frame, skipping this step!");
-        //     length = (int) temp.length();
-        // }
-
         int frameIndex = 0;
         for (File f: this.files) {
-            System.out.println(f.getName());
+            System.out.print(f.getName());
 
             // set Frame type
             char frameType = 'P';
             if (frameIndex % 10 == 0) {
                 frameType = 'I';
             }
-            frameType = 'I';
             frameIndex++;
 
             // read image and convert to YCbCr
@@ -125,119 +111,91 @@ public class mJpegEncoderService {
                 }
             YCbCrImage frame = new YCbCrImage(pixels, img.getWidth(), img.getHeight());
 
-            encodeFrameMjpg(frame, frameType, true);
-            // encodeFrameMpeg(frame, frameType, true);
+            // encodeFrameMjpg(frame, true, f.getName());
+            encodeFrameJvid(frame, frameType, true, f.getName());
+            // encodeFrameMpeg(frame, frameType, true, f.getName());
         }
 
 
-        System.out.println("Writing avi header");
-        aviHeader.writeAVIHeader(this.files.length, videoWidth, videoHeight, outputStream);
-//        outputStream.flush();
+        System.out.println("Writing file header");
+        // aviWriter.writeAVIHeader(outputStream, this.files.length, videoWidth, videoHeight);
+        jVidWriter.writeJvidHeader(outputStream, this.files.length, videoWidth, videoHeight);
 
-        System.out.println("Avi header written, writing frames");
+        System.out.println("File header written, writing frames");
         File temp = new File(outputFolder + "temp/temp");
+        System.out.println(temp.length());
         Files.copy(temp.toPath(), outputStream);
+        outputStream.flush();
 
-        System.out.println("Frames written, writing Idx1");
-        aviHeader.writeIdx1(outputStream, this.files.length);
+        // System.out.println("Frames written, writing Idx1");
+        // aviWriter.writeIdx1(outputStream, this.files.length);
 
         System.out.println("Output file: " + outputFile);
 
     }
 
-    private void encodeFrameMjpg(YCbCrImage frame, char frameType, boolean enablePrint) throws IOException {
+    private void encodeFrameMjpg(YCbCrImage frame, boolean enablePrint, String frameName) throws IOException {
         // DEBUG
         // BufferedOutputStream frameOutputStream = new BufferedOutputStream(
         //         new FileOutputStream(outputFolder + f.getName().replace(".png", ".jpg"))
         // );
 
         // init encoders
-        updateProgressStatus(0, "Initializing Encoders...");
+        updateProgressStatus(0, "Initializing Encoders...", frameName);
         runlengthEncoder = new RunLengthEncoder();
         huffmanEncoder = new HuffmanEncoder();
-        blockBuffer = new BlockBuffer();
 
         // scale and subsample image
-        updateProgressStatus(2, "Subsampling Image...");
+        updateProgressStatus(2, "Subsampling Image...", frameName);
         frame.ScaleImage();
         //image.PerformSubsampling(YCbCrImage.YUV411Sampling);
         frame.PerformSubsampling(YCbCrImage.YUV444Sampling);
 
         // split frame into blocks
-        updateProgressStatus(5, "Performing block splitting...");
+        updateProgressStatus(5, "Performing block splitting...", frameName);
         ArrayList<Block> blocks = frame.PerformBlockSplitting();
-//            System.out.println(Arrays.deepToString(blocks.get(0).getData()));
         RunLengthBlock rleBlock;
-        ArrayList<Block> DebugColorBlocks = new ArrayList<>();
-        ArrayList<Block> DebugDCTBlocks = new ArrayList<>();
-        ArrayList<Block> DebugQBlocks = new ArrayList<>();
 
         // write JPEG header sections
-        updateProgressStatus(8, "Writing frame header...");
+        updateProgressStatus(8, "Writing frame header...", frameName);
         writeHeaderSections(internalFrameBuffer, frame);
-        updateProgressStatus(10, "Processing blocks...");
+        updateProgressStatus(10, "Processing blocks...", frameName);
 
         // process each block
         int blockIndex = 0;
         for (Block block: blocks) {
             blockIndex++;
             if (enablePrint) {
-//                updateProgressStatus((int) (10 + ((double) blockIndex / blocks.size() * 100) - 20), "Processing blocks...");
-                updateProgressStatus((int) ((double) blockIndex / blocks.size() * 100), "Processing blocks...");
+//                updateProgressStatus((int) (10 + ((double) blockIndex / blocks.size() * 100) - 20), "Processing blocks...", frameName);
+                updateProgressStatus((int) ((double) blockIndex / blocks.size() * 100 * 0.9), "Processing blocks...", frameName);
             }
+//            if (enablePrint) {
+//                System.out.println("YCbCr block:");
+//                block.print();
+//            }
 
-            // I frame => perform DCT, quantization, inverses, push to buffer, proceed to VLC
-            // P frame => search in block buffer, estimate motion, subtract, perform DCT, quantization,
-            //            proceed to VLC
-            if (frameType == 'P') {
-                motionEstimator = new MotionEstimator();
-                // skip to motion estimation
-                // look through block buffer for the most similar block
-                Block similarBlock = blockBuffer.getSimilarBlock(block);
-                // compute motion vector
-//                    int[] motionVector = motionEstimator.computeMotionVector(block, similarBlock);
-                // subtract found block from input block
-                block.subtract(similarBlock);
-                // perform DCT
-                DCT.forward(block);
-                // quantize DCT coefficients
-                quantizer.quantize(block);
-                // write to buffer
-                // send motion vector to VLC
+            // perform DCT
+            DCT.forward(block);
+//            if (enablePrint) {
+//                System.out.println("DCT block:");
+//                block.print();
+//            }
 
-                // write to buffer
-            } else if (frameType == 'I'){
-//                if (enablePrint) {
-//                    System.out.println("YCbCr block:");
-//                    block.print();
-//                }
-                DebugColorBlocks.add(block.getCopy());
+            // quantize DCT coefficients
+            quantizer.quantize(block);
+//            if (enablePrint) {
+//                System.out.println("Quantized block:");
+//                block.print();
+//            }
 
-                // perform DCT
-                DCT.forward(block);
-//                if (enablePrint) {
-//                    System.out.println("DCT block:");
-//                    block.print();
-//                }
-                DebugDCTBlocks.add(block.getCopy());
+            // inverse quantize and inverse DCT a given block
+            Block savedBlock = block.getCopy();
+            quantizer.dequantize(savedBlock);
+            DCT.inverse(savedBlock);
 
-                // quantize DCT coefficients
-                quantizer.quantize(block);
-//                if (enablePrint) {
-//                    System.out.println("Quantized block:");
-//                    block.print();
-//                }
-                DebugQBlocks.add(block.getCopy());
-
-                // inverse quantize and inverse DCT a given block
-                Block savedBlock = block.getCopy();
-                quantizer.dequantize(savedBlock);
-                DCT.inverse(savedBlock);
-
-                // save it in a block buffer
-                blockBuffer.save(savedBlock);
-                // proceed to VLC
-            }
+            // save it in a block buffer
+            blockBuffer.save(savedBlock);
+            // proceed to VLC
 
             // VLC encode block
             rleBlock = runlengthEncoder.encode(block);
@@ -248,29 +206,177 @@ public class mJpegEncoderService {
             huffmanEncoder.encode(internalFrameBuffer, rleBlock);
         }
 
-//        updateProgressStatus(90, "Finishing up...");
+//        updateProgressStatus(90, "Finishing up...", frameName);
 
         // flush buffers
         huffmanEncoder.flushBuffer(internalFrameBuffer);
-        blockBuffer.flush();
+//        blockBuffer.flush();
 
         // DEBUG
         // internalFrameBuffer.dumpBufferToStreamWithoutFlushing(frameOutputStream);
 
         // write JPEG trailer section
         writeTrailerSection(internalFrameBuffer);
-        updateProgressStatus(100, "Frame finished!");
+        updateProgressStatus(101, "Frame finished!", frameName);
 
-        aviHeader.writeDataChunk(tempOutputStream, internalFrameBuffer);
+        aviWriter.writeDataChunk(tempOutputStream, internalFrameBuffer);
+        tempOutputStream.flush();
+    }
+    private void encodeFrameJvid(YCbCrImage frame, char frameType, boolean enablePrint, String frameName) throws IOException {
+        // DEBUG
+         BufferedOutputStream frameOutputStream = new BufferedOutputStream(
+                 new FileOutputStream(outputFolder + frameName.replace(".png", ".jpg"))
+         );
+         InternalFrameBuffer frameOutputBuffer = new InternalFrameBuffer();
+
+        // init encoders
+        updateProgressStatus(0, "Initializing Encoders...", frameName);
+        runlengthEncoder = new RunLengthEncoder();
+        huffmanEncoder = new HuffmanEncoder();
+
+
+        // DEGUG
+        // This is a massive fucking mess because we dont have any proper way of testing yet
+        // TODO: ADD JUNIT SUPPORT AND FUCKING TEST SHIT SEPARATELY
+        // this essentially proves that we can decode a single huffman code at once
+        // it also finds the EOB byte and correctly stops
+        // finally, we now need to ensure the following structure for the bitstream:
+        // mvec (1 byte) hufBlock (1 byte) EOB (1 byte)
+        // so 3 bytes per block totalling up to a whopping ~300KB/frame
+        // for reference, jpeg-ing them results in 130KB/frame
+        // incredible but at least it would work so idc
+//        RunLengthBlock rleBlock1 = new RunLengthBlock();
+//        rleBlock1.setType('U');
+//        ArrayList<RunLength> rleData = new ArrayList<>();
+//        rleData.add(new RunLength(-1, 0, 0));
+//        rleData.add(new RunLength(0, 0, 0));
+//        rleBlock1.setData(rleData);
+//        huffmanEncoder.encode(frameOutputBuffer, rleBlock1);
+//        huffmanEncoder.flushBuffer(frameOutputBuffer);
+//        RunLengthBlock rleBlock12 = new RunLengthBlock();
+//        rleBlock12.setType('Y');
+//        huffmanEncoder.noOfBitsLeftInCurrentByte = 8;
+//        huffmanEncoder.decodeBlock(new byte[]{(byte)0b11100000, (byte)0b101000, (byte)0b0, (byte)0b101000,}, rleBlock12);
+//        rleBlock12.print();
+//        writeHeaderSections(frameOutputBuffer, frame);
+//        frameOutputBuffer.dumpBufferToStream(frameOutputStream);
+
+        // scale and subsample image
+        updateProgressStatus(2, "Subsampling Image...", frameName);
+        frame.ScaleImage();
+        //image.PerformSubsampling(YCbCrImage.YUV411Sampling);
+        frame.PerformSubsampling(YCbCrImage.YUV444Sampling);
+
+        // split frame into blocks
+        updateProgressStatus(5, "Performing block splitting...", frameName);
+        ArrayList<Block> blocks = frame.PerformBlockSplitting();
+        RunLengthBlock rleBlock;
+
+        // process each block
+        updateProgressStatus(10, "Processing blocks...", frameName);
+
+        // This is used to determine if we have to write a new codeword for the block
+        // pBlockCodeword = mvec => only motion vector is written
+        // pBlockCodeword = errb => motion vector and error block data is written
+        // only write the codeword once per change
+        String pBlockCodeword = "";
+        boolean codewordChanged = true;
+
+        int blockIndex = 0;
+        for (Block block: blocks) {
+            blockIndex++;
+            if (enablePrint) {
+//                updateProgressStatus((int) (10 + ((double) blockIndex / blocks.size() * 100) - 20), "Processing blocks...", frameName);
+                updateProgressStatus((int) (((double) blockIndex / blocks.size() * 100 * 0.9)), "Processing blocks...", frameName);
+            }
+
+            // I frame => perform DCT, quantization, inverses, push to buffer, proceed to VLC
+            // P frame => search in block buffer, estimate motion, subtract, perform DCT, quantization,
+            //            proceed to VLC
+            if (frameType == 'P') {
+                motionEstimator = new MotionEstimator();
+
+                // look through block buffer for the most similar block
+                Block similarBlock = blockBuffer.getSimilarBlock(block);
+
+                // compute motion vector
+                MotionVector motionVector = motionEstimator.computeMotionVector(block, similarBlock);
+
+                // subtract found block from input block
+                block.subtract(similarBlock);
+
+                // if the error is 0, don't write it
+                if (!block.isEmpty()) {
+                    codewordChanged = !pBlockCodeword.equals("errb");
+                    pBlockCodeword = "errb";
+
+                    // perform DCT
+                    DCT.forward(block);
+
+                    // quantize DCT coefficients
+                    quantizer.quantize(block);
+                } else {
+                    codewordChanged = !pBlockCodeword.equals("mvec");
+                    pBlockCodeword = "mvec";
+                }
+
+                // write motion vector to buffer
+                if (codewordChanged) {
+                    // codeword changed, write it
+                    internalFrameBuffer.write(new DWORD(pBlockCodeword).byteValue());
+                }
+
+                internalFrameBuffer.write(motionVector.byteValue());
+            } else if (frameType == 'I'){
+                // save a copy in the block buffer
+                Block savedBlock = block.getCopy();
+
+                // perform DCT
+                DCT.forward(block);
+
+                // quantize DCT coefficients
+                quantizer.quantize(block);
+//                // I have no clue why this step is needed in actual encoders but for this project it results in shitty quality
+//                // inverse quantize and inverse DCT a given block
+//                quantizer.dequantize(savedBlock);
+//                DCT.inverse(savedBlock);
+
+                // save it in a block buffer
+                blockBuffer.save(savedBlock);
+            }
+
+            if (frameType == 'I' || (frameType == 'P' && !block.isEmpty())) {
+                // VLC encode block
+                rleBlock = runlengthEncoder.encode(block);
+//                internalFrameBuffer.write(new DWORD("erbk").byteValue());
+//                internalFrameBuffer.reset();
+                huffmanEncoder.encode(internalFrameBuffer, rleBlock);
+            }
+        }
+
+//        updateProgressStatus(90, "Finishing up...", frameName);
+//        internalFrameBuffer.write(new DWORD("huff").byteValue());
+
+        // flush buffers
+        huffmanEncoder.flushBuffer(internalFrameBuffer);
+
+        // DEBUG
+        internalFrameBuffer.dumpBufferToStreamWithoutFlushing(frameOutputStream);
+        writeTrailerSection(frameOutputBuffer);
+        frameOutputBuffer.dumpBufferToStream(frameOutputStream);
+        frameOutputStream.flush();
+
+        updateProgressStatus(100, "Frame finished!", frameName);
+
+        jVidWriter.writeDataChunk(tempOutputStream, internalFrameBuffer, frameType);
         tempOutputStream.flush();
     }
 
-    private void encodeFrameMpeg(YCbCrImage frame, char frameType, boolean enablePrint) throws IOException {
+    private void encodeFrameMpeg(YCbCrImage frame, char frameType, boolean enablePrint, String frameName) throws IOException {
         // init encoders
         runlengthEncoder = new RunLengthEncoder();
         huffmanEncoder = new HuffmanEncoder();
         exponentialGolombEncoder = new ExponentialGolombEncoder();
-        blockBuffer = new BlockBuffer();
 
         // scale and subsample image
         frame.ScaleImage();
@@ -282,9 +388,6 @@ public class mJpegEncoderService {
 //            System.out.println(Arrays.deepToString(blocks.get(0).getData()));
         RunLengthBlock rleBlock;
         ExponentialGolombBlock egBlock;
-        ArrayList<Block> DebugColorBlocks = new ArrayList<>();
-        ArrayList<Block> DebugDCTBlocks = new ArrayList<>();
-        ArrayList<Block> DebugQBlocks = new ArrayList<>();
 
         // write JPEG header sections (REMOVE THIS)
         writeHeaderSections(internalFrameBuffer, frame);
@@ -316,7 +419,6 @@ public class mJpegEncoderService {
                     System.out.println("YCbCr block:");
                     block.print();
                 }
-                DebugColorBlocks.add(block.getCopy());
 
                 // perform DCT
                 DCT.forward(block);
@@ -324,7 +426,6 @@ public class mJpegEncoderService {
                     System.out.println("DCT block:");
                     block.print();
                 }
-                DebugDCTBlocks.add(block.getCopy());
 
                 // quantize DCT coefficients
                 quantizer.quantize(block);
@@ -332,7 +433,6 @@ public class mJpegEncoderService {
                     System.out.println("Quantized block:");
                     block.print();
                 }
-                DebugQBlocks.add(block.getCopy());
 
                 // inverse quantize and inverse DCT a given block
                 Block savedBlock = block.getCopy();
@@ -356,7 +456,7 @@ public class mJpegEncoderService {
 
         // flush buffers
         huffmanEncoder.flushBuffer(internalFrameBuffer);
-        blockBuffer.flush();
+//        blockBuffer.flush();
 
         // write JPEG trailer section (REMOVE THIS)
         int frameLength = writeTrailerSection(internalFrameBuffer);
@@ -367,7 +467,6 @@ public class mJpegEncoderService {
         runlengthEncoder = new RunLengthEncoder();
         huffmanEncoder = new HuffmanEncoder();
         exponentialGolombEncoder = new ExponentialGolombEncoder();
-        blockBuffer = new BlockBuffer();
 
         int[][] pixels = new int[image.getHeight()][image.getWidth()];
 
@@ -640,15 +739,16 @@ public class mJpegEncoderService {
     }
 
     private void initProgressStatus() {
-        this.progressBar = new StringBuilder("[");
+        this.progressBar = new StringBuilder();
 
     }
 
-    private void updateProgressStatus(int progress, String status) {
+    private void updateProgressStatus(int progress, String status, String frame) {
         int progressLength = 20;
         int completedLength = (int) ((double) progress / 100 * progressLength);
 
-        this.progressBar.setLength(1);
+        this.progressBar.setLength(0);
+        this.progressBar.append(frame).append(" [");
         for (int i = 0; i < progressLength; i++) {
             if (i < completedLength) {
                 this.progressBar.append("-");

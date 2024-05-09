@@ -1,5 +1,6 @@
 package jevc;
 
+import jevc.entities.Globals;
 import jevc.entities.YCbCrImage;
 import jevc.service.mJpegEncoderService;
 
@@ -32,6 +33,9 @@ public class mJpegEncoder {
         }
 
         if (!Objects.isNull(files)) {
+            BufferedImage resolution = ImageIO.read(files[0]);
+            Globals.MAX_HEIGHT = resolution.getHeight();
+            Globals.MAX_WIDTH = resolution.getWidth();
             mJpegEncoderService encoder = new mJpegEncoderService(files, outputfile, outputFolder);
             encoder.compress();
         }

@@ -12,6 +12,7 @@ import jevc.operations.RunLengthEncoder;
 import java.io.BufferedOutputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Vector;
 
@@ -64,6 +65,8 @@ public class JPEGEncoderService {
     }
 
     public void compress() throws IOException {
+        System.setOut(new PrintStream(new BufferedOutputStream(new FileOutputStream("log.txt"))));
+
         image.ScaleImage();
         //image.PerformSubsampling(YCbCrImage.YUV411Sampling);
         image.PerformSubsampling(YCbCrImage.YUV444Sampling);
@@ -76,29 +79,10 @@ public class JPEGEncoderService {
         writeHeaderSections(outputStream);
 
         for (Block block: blocks) {
-            boolean enablePrint = blocks.indexOf(block) == 0;
-
-            if (enablePrint) {
-                System.out.println("YCbCr block:");
-                block.print();
-            }
-            DebugColorBlocks.add(block.getCopy());
             DCT.forward(block);
-            if (enablePrint) {
-                System.out.println("DCT block:");
-                block.print();
-            }
-            DebugDCTBlocks.add(block.getCopy());
             quantizer.quantize(block);
-            if (enablePrint) {
-                System.out.println("Quantized block:");
-                block.print();
-            }
-            DebugQBlocks.add(block.getCopy());
             rleBlock = runlengthEncoder.encode(block);
-            if (enablePrint) {
-                rleBlock.print();
-            }
+            rleBlock.print();
             huffmanEncoder.encode(internalFrameBuffer, rleBlock);
         }
 

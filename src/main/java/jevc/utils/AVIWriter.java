@@ -7,9 +7,8 @@ import jevc.entities.WORD;
 import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 
-public class AVIHeader {
+public class AVIWriter {
     private final RIFF riff;
     private final LIST hdrl;
     private final MainAVIHeader avih;
@@ -18,14 +17,13 @@ public class AVIHeader {
     private final EXBMINFOHEADER strf;
     private final DWORD ddww;
     private final DWORD szs;
-    private DWORD totalFrames;
     private final LIST movi;
 
     private final int fps = 10;
     private final int bytesPerSec = 7000;
     private ArrayList<Integer> frameLengthBuffer;
 
-    public AVIHeader() {
+    public AVIWriter() {
         riff = new RIFF(
                 new DWORD("RIFF"),
                 new DWORD(-1),
@@ -109,10 +107,9 @@ public class AVIHeader {
         frameLengthBuffer = new ArrayList<>();
     }
 
-    public void writeAVIHeader(int frameCount, DWORD width, DWORD height, BufferedOutputStream outputStream) throws IOException {
+    public void writeAVIHeader(BufferedOutputStream outputStream, int frameCount, DWORD width, DWORD height) throws IOException {
         // get total length
         int length = frameLengthBuffer.stream().reduce(0, Integer::sum);
-        System.out.println(length);
         // fill in missing atoms
         riff.dwSize = getRiffSize(frameCount, length);
         avih.dwTotalFrames = new DWORD(frameCount);
@@ -125,7 +122,7 @@ public class AVIHeader {
         strf.biHeight = height;
         strf.biSizeImage = new DWORD(getStrfImageSize(width, height, 24));
         movi.dwSize = getMoviSize(frameCount, length);
-        totalFrames = new DWORD(frameCount);
+        DWORD totalFrames = new DWORD(frameCount);
 
         // Write RIFF atom
         outputStream.write(riff.dwRIFF.byteValue());
@@ -228,8 +225,6 @@ public class AVIHeader {
 
         outputStream.write(data.dwFourCc.byteValue());
         outputStream.write(data.dwSize.byteValue());
-        System.out.println(buffer.size());
-        System.out.println(Arrays.toString(data.dwSize.byteValue()));
         buffer.dumpBufferToStream(outputStream);
     }
 

@@ -68,4 +68,13 @@ public class Block {
             }
         }
     }
+
+    public boolean isEmpty() {
+        for (int i=0; i<BLOCKSIZE; i++) {
+            for (int j = 0; j < BLOCKSIZE; j++) {
+                if (data[i][j] != 0) return false;
+            }
+        }
+        return true;
+    }
 }
