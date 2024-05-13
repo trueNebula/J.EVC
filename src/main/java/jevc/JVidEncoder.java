@@ -11,14 +11,15 @@ import java.util.Objects;
 
 public class JVidEncoder {
     public static void main(String[] args) throws IOException {
-        if (args.length<1) {
-            System.out.println("Run the program: java pdav.JPEGEncoder imageFile!");
+        if (args.length < 2) {
+            System.out.println("Run the program: java jevc.JVidEncoder folder fps");
         }
 
         String fileName = "output";
         String outputFolder = args[0] + "/compressed/";
-        String outputfile = outputFolder + fileName + ".avi";
+        String outputfile = outputFolder + fileName + ".jvd";
         File[] files = null;
+        Globals.FRAMERATE = Integer.parseInt(args[1]);
 
         try {
             files = new File(args[0]).listFiles(
