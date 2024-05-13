@@ -47,7 +47,7 @@ public class JPEGEncoderService {
     private final RunLengthEncoder runlengthEncoder;
     private final HuffmanEncoder huffmanEncoder;
     private BufferedOutputStream outputStream;
-    private InternalFrameBuffer internalFrameBuffer;
+    private final InternalFrameBuffer internalFrameBuffer;
 
     public JPEGEncoderService(YCbCrImage image, String outfile) {
         this.image = image;
@@ -81,6 +81,7 @@ public class JPEGEncoderService {
         for (Block block: blocks) {
             DCT.forward(block);
             quantizer.quantize(block);
+            block.print();
             rleBlock = runlengthEncoder.encode(block);
             rleBlock.print();
             huffmanEncoder.encode(internalFrameBuffer, rleBlock);

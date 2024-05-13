@@ -12,7 +12,7 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Vector;
 
-public class mJpegEncoderService {
+public class JVidEncoderService {
     // the Start Of Image marker
     private static final byte[] SOI = {(byte) 0xff,(byte) 0xd8};
     // the Define Quantization Table marker
@@ -44,18 +44,18 @@ public class mJpegEncoderService {
     private RunLengthEncoder runlengthEncoder;
     private HuffmanEncoder huffmanEncoder;
     private ExponentialGolombEncoder exponentialGolombEncoder;
-    private BlockBuffer blockBuffer;
+    private final BlockBuffer blockBuffer;
     private MotionEstimator motionEstimator;
     private BufferedOutputStream outputStream;
     private BufferedOutputStream tempOutputStream;
-    private AVIWriter aviWriter;
-    private JVidWriter jVidWriter;
+    private final AVIWriter aviWriter;
+    private final JVidWriter jVidWriter;
     private final String outputFolder;
     private final String outputFile;
 
     private StringBuilder progressBar;
 
-    public mJpegEncoderService(File[] files, String outfile, String outputFolder) {
+    public JVidEncoderService(File[] files, String outfile, String outputFolder) {
         this.files = files;
         this.outputFolder = outputFolder;
         this.outputFile = outfile;
@@ -280,7 +280,7 @@ public class mJpegEncoderService {
         // pBlockCodeword = errb => motion vector and error block data is written
         // only write the codeword once per change
         String pBlockCodeword = "";
-        boolean codewordChanged = true;
+        boolean codewordChanged;
 
         int blockIndex = 0;
         for (Block block: blocks) {
@@ -372,6 +372,7 @@ public class mJpegEncoderService {
         tempOutputStream.flush();
     }
 
+    // UNUSED
     private void encodeFrameMpeg(YCbCrImage frame, char frameType, boolean enablePrint, String frameName) throws IOException {
         // init encoders
         runlengthEncoder = new RunLengthEncoder();
@@ -463,6 +464,7 @@ public class mJpegEncoderService {
 
     }
 
+    // UNUSED
     private int preEncodeFrame(BufferedImage image) throws IOException {
         runlengthEncoder = new RunLengthEncoder();
         huffmanEncoder = new HuffmanEncoder();
@@ -527,7 +529,7 @@ public class mJpegEncoderService {
      * - Ythumbnail: thumbnail vertical pixel count (1 byte)
      * - packed RGB values for the thumbnail pixels (3*Xthumbnail*Ythumbnail bytes)
      */
-    private void writeAPP0Segment(InternalFrameBuffer internalFrameBuffer) throws IOException {
+    private void writeAPP0Segment(InternalFrameBuffer internalFrameBuffer) {
         byte[] JFIFSegment = new byte[18];
         JFIFSegment[0] = JFIF[0];
         JFIFSegment[1] = JFIF[1];
@@ -550,7 +552,7 @@ public class mJpegEncoderService {
         internalFrameBuffer.write(JFIFSegment);
     }
 
-    private void writeCOMSegment(InternalFrameBuffer internalFrameBuffer) throws IOException {
+    private void writeCOMSegment(InternalFrameBuffer internalFrameBuffer) {
         byte[] commentSegment = new byte[4 + ENCODER_INFO.length()];
         commentSegment[0] = COM[0];
         commentSegment[1] = COM[1];
@@ -573,7 +575,7 @@ public class mJpegEncoderService {
      *	    o sampling factors (1 byte): bits 0-3 vertical, 4-7 horizontal
      *	    o quantization table number (1 byte)
      */
-    private void writeSOF0Segment(InternalFrameBuffer internalFrameBuffer, YCbCrImage frame) throws IOException {
+    private void writeSOF0Segment(InternalFrameBuffer internalFrameBuffer, YCbCrImage frame) {
         byte[] SOF0Segment = new byte[19];
         SOF0Segment[0] = SOF[0];
         SOF0Segment[1] = SOF[1];
@@ -612,7 +614,7 @@ public class mJpegEncoderService {
      *	    o end of spectral selection (1 byte)
      *	    o 1 ignorable byte (?)
      */
-    private void writeSOSSegment(InternalFrameBuffer internalFrameBuffer) throws IOException {
+    private void writeSOSSegment(InternalFrameBuffer internalFrameBuffer) {
         byte[] SOSSegment = new byte[14];
         SOSSegment[0] = SOS[0];
         SOSSegment[1] = SOS[1];
@@ -642,7 +644,7 @@ public class mJpegEncoderService {
      *		           	              bit 4..7 - precision of QT (0 = 8bit, otherwise = 16bit)
      *	    o QT bytes, 64*(precision+1) bytes: the QT values
      */
-    private void writeDQTSegment(InternalFrameBuffer internalFrameBuffer) throws IOException {
+    private void writeDQTSegment(InternalFrameBuffer internalFrameBuffer) {
         byte[] DQTSegment = new byte[134];
         DQTSegment[0] = DQT[0];
         DQTSegment[1] = DQT[1];
@@ -675,7 +677,7 @@ public class mJpegEncoderService {
      *	   Symbols, n bytes (see above): table containing the symbols in order of increasing
      *				       code length (n=total number of codes)
      */
-    private void writeDHTSegment(InternalFrameBuffer internalFrameBuffer) throws IOException {
+    private void writeDHTSegment(InternalFrameBuffer internalFrameBuffer) {
         Vector<int[]> bits = new Vector<>();
         bits.addElement(HuffmanEncoder.BITS_DC_LUMINANCE);
         bits.addElement(HuffmanEncoder.BITS_AC_LUMINANCE);

@@ -1,17 +1,15 @@
 package jevc;
 
 import jevc.entities.Globals;
-import jevc.entities.YCbCrImage;
-import jevc.service.mJpegEncoderService;
+import jevc.service.JVidEncoderService;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Objects;
 
-public class mJpegEncoder {
+public class JVidEncoder {
     public static void main(String[] args) throws IOException {
         if (args.length<1) {
             System.out.println("Run the program: java pdav.JPEGEncoder imageFile!");
@@ -36,7 +34,7 @@ public class mJpegEncoder {
             BufferedImage resolution = ImageIO.read(files[0]);
             Globals.MAX_HEIGHT = resolution.getHeight();
             Globals.MAX_WIDTH = resolution.getWidth();
-            mJpegEncoderService encoder = new mJpegEncoderService(files, outputfile, outputFolder);
+            JVidEncoderService encoder = new JVidEncoderService(files, outputfile, outputFolder);
             encoder.compress();
         }
     }
