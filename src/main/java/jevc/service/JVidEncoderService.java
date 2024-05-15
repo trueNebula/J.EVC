@@ -122,7 +122,6 @@ public class JVidEncoderService {
 
         System.out.println("File header written, writing frames");
         File temp = new File(outputFolder + "temp/temp");
-        System.out.println(temp.length());
         Files.copy(temp.toPath(), outputStream);
         outputStream.flush();
 

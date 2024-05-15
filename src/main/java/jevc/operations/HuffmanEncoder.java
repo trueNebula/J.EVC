@@ -309,7 +309,7 @@ public class HuffmanEncoder {
             noBlocksInMCU += horizontalSamplingFactors[i] * verticalSamplingFactors[i];
         }
 
-        System.out.print("        	A MCU contains the following blocks in this order: ");
+//        System.out.print("        	A MCU contains the following blocks in this order: ");
         for (int i=0; i<3; i++) {
             char blocktype = switch (i) {
                 case 0 -> 'Y';
@@ -317,11 +317,11 @@ public class HuffmanEncoder {
                 case 2 -> 'V';
                 default -> ' ';
             };
-            for (int j=0; j<horizontalSamplingFactors[i]*verticalSamplingFactors[i]; j++) {
-                System.out.print(blocktype + ", ");
-            }
+//            for (int j=0; j<horizontalSamplingFactors[i]*verticalSamplingFactors[i]; j++) {
+//                System.out.print(blocktype + ", ");
+//            }
         }
-        System.out.println();
+//        System.out.println();
     }
 
     public void encode (InternalFrameBuffer outputStream, RunLengthBlock block) throws IOException {
@@ -451,8 +451,8 @@ public class HuffmanEncoder {
 
         int i = 0;
         int noBlocks = getNumberOfDecodingBlocks(sampling, width, height);
-        System.out.println("HuffmanEncoder::decode() We will decode " + noBlocks + " 8x8 blocks [" +
-                "width=" + width + " height=" + height + " sampling=" + sampling + "]");
+//        System.out.println("HuffmanEncoder::decode() We will decode " + noBlocks + " 8x8 blocks [" +
+//                "width=" + width + " height=" + height + " sampling=" + sampling + "]");
         while (idxCurrentByte<encodedBitstream.length) {
             /* At the end of the compressed bitstream there might be stuffed bits to the byte border (i.e. maximum
              * 7 stuffed bits). We need to stop after we have read and decoded enough blocks. Below is a code
@@ -471,18 +471,18 @@ public class HuffmanEncoder {
                  */
                 if (i==noBlocks) {
                     // this is the end of the compressed bitstream; the rest are stuffed bits, we don't care
-                    System.out.println("HuffmanEncoder::decode() FINISHING reading/recoding all required blocks. " +
-                            "Leftover bits: " + noOfBitsLeftInCurrentByte);
+//                    System.out.println("HuffmanEncoder::decode() FINISHING reading/recoding all required blocks. " +
+//                            "Leftover bits: " + noOfBitsLeftInCurrentByte);
                     break;
                 }
             }
-            System.out.println("idxCurrentByte= " + idxCurrentByte);
+//            System.out.println("idxCurrentByte= " + idxCurrentByte);
             RunLengthBlock rleBlock = new RunLengthBlock();
             rleBlock.setType(getNextDecodedBlockType());
             decodeBlock(encodedBitstream, rleBlock);
             rleBlocksArray.add(rleBlock);
-            System.out.println("HuffmanEncoder::decode() decoded block " + i + " of type " + rleBlock.getType() +
-                    " with " + rleBlock.getSize() + " runlength elements.");
+//            System.out.println("HuffmanEncoder::decode() decoded block " + i + " of type " + rleBlock.getType() +
+//                    " with " + rleBlock.getSize() + " runlength elements.");
             i++;
         }
 
@@ -498,7 +498,7 @@ public class HuffmanEncoder {
         sizeDC = decodeHuffmanCodeword(encodedBitstream, rleBlock.getType(), true);
         amplitude = decodeAmplitudeValue(encodedBitstream, sizeDC);
         rleBlock.getData().add(new RunLength(-1, sizeDC, amplitude));
-        System.out.println("[-1," + sizeDC + "," + amplitude + "] " );
+//        System.out.println("[-1," + sizeDC + "," + amplitude + "] " );
 
         // decode the AC coefficients RunLength elements
         int acCoefcount = 0;
@@ -509,13 +509,13 @@ public class HuffmanEncoder {
             sizeAC = x & 0x0f;
             if ((runlength==0) && (sizeAC==0)) {
                 // EOB symbol read
-                System.out.println(" End-Of-Block red!");
+//                System.out.println(" End-Of-Block read!");
                 rleBlock.getData().add(new RunLength(runlength, sizeAC, 0));
                 break;
             }
             if (x == 0xf0) {
                 // (F,0) - ZRL code (Zero RunLength) - we must add 16 AC coefficients equal to ZERO
-                System.out.println(" ZeroRunLength code red!");
+//                System.out.println(" ZeroRunLength code read!");
                 ZRL += 16;
             } else {
                 if (ZRL>0) {
@@ -528,10 +528,10 @@ public class HuffmanEncoder {
                 }
                 rleBlock.getData().add(new RunLength(runlength, sizeAC, amplitude));
                 acCoefcount = acCoefcount + 1 + runlength;
-                System.out.println("[" + runlength + "," + sizeAC + "," + amplitude + "] " );
+//                System.out.println("[" + runlength + "," + sizeAC + "," + amplitude + "] " );
             }
         }
-        System.out.println();
+//        System.out.println();
     }
 
     private int decodeHuffmanCodeword(byte[] encodedBitstream, char HuffmanTableType, boolean isDC) {
@@ -553,8 +553,8 @@ public class HuffmanEncoder {
                 else huffmanTable = ACChromaHuffmanTable;
             }
         }
-        System.out.println("HuffmanEncoder::decodeHuffmanCodeword() using Huffman table " +
-                isDC + " " + HuffmanTableType);
+//        System.out.println("HuffmanEncoder::decodeHuffmanCodeword() using Huffman table " +
+//                isDC + " " + HuffmanTableType);
 
         int codeBuffer = 0;     // the largest Huffman codeword has 16 bits
         // codeBuffer stores binary values in the least significant bits
@@ -596,8 +596,8 @@ public class HuffmanEncoder {
             decodeByte(encodedBitstream);
             if (symbol != -1) {
                 // codeword found in Huffman tables
-                System.out.println("codeword="+getBinary(codeBuffer,codeBufferSize) +
-                        " idxCurrentByte=" + idxCurrentByte + " noOfBitsLeftInCurrentByte=" + noOfBitsLeftInCurrentByte);
+//                System.out.println("codeword="+getBinary(codeBuffer,codeBufferSize) +
+//                        " idxCurrentByte=" + idxCurrentByte + " noOfBitsLeftInCurrentByte=" + noOfBitsLeftInCurrentByte);
                 return symbol;
             }
         }
@@ -615,7 +615,7 @@ public class HuffmanEncoder {
             }
             if (idxCurrentByte<encodedBitstream.length) {
                 previousByte = encodedBitstream[idxCurrentByte] & 0xff;
-                System.out.println("current decoding byte is: " + getBinary(encodedBitstream[idxCurrentByte], 8));
+//                System.out.println("current decoding byte is: " + getBinary(encodedBitstream[idxCurrentByte], 8));
             }
         }
     }
@@ -678,8 +678,8 @@ public class HuffmanEncoder {
             amplitude += 1;
         }
 
-        System.out.println("amplitude="+getBinary(amplitude,origsize) +
-                " idxCurrentByte=" + idxCurrentByte + " noOfBitsLeftInCurrentByte=" + noOfBitsLeftInCurrentByte);
+//        System.out.println("amplitude="+getBinary(amplitude,origsize) +
+//                " idxCurrentByte=" + idxCurrentByte + " noOfBitsLeftInCurrentByte=" + noOfBitsLeftInCurrentByte);
         return amplitude;
     }
 

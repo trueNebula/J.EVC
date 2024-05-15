@@ -5,8 +5,13 @@ import jevc.entities.Globals;
 import jevc.entities.InternalFrameBuffer;
 import jevc.entities.WORD;
 
+import jevc.utils.ByteConverter;
+
 import java.io.BufferedOutputStream;
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
 
@@ -38,8 +43,6 @@ public class JVidWriter {
     }
 
     public void writeJvidHeader(BufferedOutputStream outputStream, int frameCount, DWORD width, DWORD height) throws IOException {
-        // get total length
-        System.out.println("Lenghts: " + Arrays.toString(frameLengthBuffer.toArray()) + " Total: " + getJvidSize(frameCount).intValue());
         // fill in missing atoms
         jVidHeader.dwSize = getJvidSize(frameCount);
         jVidStreamHeader.dwTotalFrames = new DWORD(frameCount);
@@ -81,6 +84,53 @@ public class JVidWriter {
         outputStream.write(data.dwSize.byteValue());
         outputStream.write(data.dwType.byteValue());
         buffer.dumpBufferToStream(outputStream);
+    }
+
+    public int[] readHeader(RandomAccessFile file) {
+        byte[] buffer = new byte[4];
+        int bitstreamSize = -1;
+        int fps = -1, frameCount = -1, bitrate = -1, width = -1, height = -1;
+
+        try {
+            // Read JVID Header
+            if (!ByteConverter.checkString(file, buffer, "JVID")) {
+                throw new IOException("Invalid JVid Header");
+            }
+
+            bitstreamSize = ByteConverter.readInt(file, buffer);
+            System.out.println("Bitstream Size: " + bitstreamSize);
+
+            // Read JVid Stream Header
+            if (!ByteConverter.checkString(file, buffer, "jvih")) {
+                throw new IOException("Error: Invalid JVid Stream Header");
+            }
+
+            int jvihSize = ByteConverter.readInt(file, buffer);
+            System.out.println("JVid Stream Header Size: " + jvihSize);
+
+            if (jvihSize != 28) {
+                throw new IOException("Error: Invalid JVid Stream Header Size");
+            }
+
+            fps = 1000000 / ByteConverter.readInt(file, buffer);
+            System.out.println("Framerate: " + fps);
+
+            bitrate = ByteConverter.readInt(file, buffer);
+            System.out.println("Bitrate: " + bitrate);
+
+            frameCount = ByteConverter.readInt(file, buffer);
+            System.out.println("Frame Count: " + frameCount);
+
+            width = ByteConverter.readInt(file, buffer);
+            System.out.println("Width: " + width);
+
+            height = ByteConverter.readInt(file, buffer);
+            System.out.println("Height: " + height);
+
+        } catch (IOException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+        return new int[]{bitstreamSize, fps, frameCount, bitrate, width, height};
     }
 
     private DWORD getJvidSize(int frameCount) {

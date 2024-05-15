@@ -87,8 +87,8 @@ public class RunLengthEncoder {
             System.err.println("RunLengthEncoder::decode() run length block " +
                     "doesn't start with DC coefficient!");
         }
-        System.out.println("RunLengthEncoder::decode() Processing RunLengthBlock with size " +
-                rleBlock.getSize());
+//        System.out.println("RunLengthEncoder::decode() Processing RunLengthBlock with size " +
+//                rleBlock.getSize());
 
         int type = switch (rleBlock.getType()) {
             case 'Y' -> 0;
@@ -103,7 +103,7 @@ public class RunLengthEncoder {
         int i = 1;
         for(RunLength rlb: rleBlock.getData()) {
             int run = rlb.getRunlength();
-            System.out.println("RunLength ["+rlb.getRunlength()+","+rlb.getSize()+","+rlb.getAmplitude()+"] i="+i);
+//            System.out.println("RunLength ["+rlb.getRunlength()+","+rlb.getSize()+","+rlb.getAmplitude()+"] i="+i);
             while (run>0) {
                 data[ZIGZAG_ORDER[i]/8][ZIGZAG_ORDER[i]%8] = 0;
                 run--;
@@ -114,7 +114,7 @@ public class RunLengthEncoder {
         }
         RunLength rlb = rleBlock.getData().get(rleBlock.getSize()-1);
         if ((i<64) && ((rlb.getRunlength()!=0) || (rlb.getSize()!=0) || (rlb.getAmplitude()!=0))) {
-            System.err.println("RunLengthEncoder::decode() less than 64 coefficients and no End-Of-Block!");
+//            System.err.println("RunLengthEncoder::decode() less than 64 coefficients and no End-Of-Block!");
         }
         while (i<64) {
             data[ZIGZAG_ORDER[i]/8][ZIGZAG_ORDER[i]%8] = 0;

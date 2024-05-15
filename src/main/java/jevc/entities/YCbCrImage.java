@@ -70,8 +70,8 @@ public class YCbCrImage {
         int[][] data;
 
         for (Block block : blocks) {
-            System.out.println("Adding block " + block.getType() + " with positions " +
-                    "[posY=" + block.getPosY() + ", posX=" + block.getPosX() + "] to the image ..");
+//            System.out.println("Adding block " + block.getType() + " with positions " +
+//                    "[posY=" + block.getPosY() + ", posX=" + block.getPosX() + "] to the image ..");
             switch (block.getType()) {
                 case 'Y' -> {
                     data = block.getData();
@@ -853,7 +853,7 @@ public class YCbCrImage {
     public void writePNGFile(String outfile) throws IOException {
         BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_USHORT_GRAY);
         int pixel;
-        System.out.println(outfile+" Y: ---------------------");
+//        System.out.println(outfile+" Y: ---------------------");
         for (int i=0; i<height; i++) {
             for (int j = 0; j < width; j++) {
                 if (outfile.equals("DebugDCTcoefficients")) {
@@ -864,14 +864,14 @@ public class YCbCrImage {
                     Y[i][j] = (int) ((Y[i][j] + 128) *1.4);
                 }
                 pixel = clamp(Y[i][j]);
-                System.out.print(" " + Y[i][j]);
+//                System.out.print(" " + Y[i][j]);
                 Color color = new Color(pixel, pixel, pixel);
                 image.setRGB(j, i, color.getRGB());
             }
-            System.out.println();
+//            System.out.println();
         }
-        System.out.println(outfile + " Cb: ---------------------");
-        ImageIO.write(image, "png", new File(outfile+"-Y.png"));
+//        System.out.println(outfile + " Cb: ---------------------");
+        ImageIO.write(image, "png", new File(outfile));
         for (int i=0; i<height; i++) {
             for (int j = 0; j < width; j++) {
                 if (outfile.equals("DebugDCTcoefficients")) {
@@ -882,13 +882,13 @@ public class YCbCrImage {
                     Y[i][j] = (int) ((Y[i][j] + 128) *1.4);
                 }
                 pixel = clamp(Cb[i][j]);
-                System.out.print(" " + Cb[i][j]);
+//                System.out.print(" " + Cb[i][j]);
                 Color color = new Color(pixel, pixel, pixel);
                 image.setRGB(j, i, color.getRGB());
             }
-            System.out.println();
+//            System.out.println();
         }
-        System.out.println(outfile + " Cr: ---------------------");
+//        System.out.println(outfile + " Cr: ---------------------");
         ImageIO.write(image, "png", new File(outfile+"-Cb.png"));
         for (int i=0; i<height; i++) {
             for (int j = 0; j < width; j++) {
@@ -900,11 +900,11 @@ public class YCbCrImage {
                     Y[i][j] = (int) ((Y[i][j] + 128) *1.4);
                 }
                 pixel = clamp(Cr[i][j]);
-                System.out.print(" " + Cr[i][j]);
+//                System.out.print(" " + Cr[i][j]);
                 Color color = new Color(pixel, pixel, pixel);
                 image.setRGB(j, i, color.getRGB());
             }
-            System.out.println();
+//            System.out.println();
         }
         ImageIO.write(image, "png", new File(outfile+"-Cr.png"));
     }

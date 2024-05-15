@@ -29,6 +29,11 @@ public class DWORD {
 
     }
 
+    public DWORD (byte[] value) {
+        this.high = new WORD(value[0], value[1]);
+        this.low = new WORD(value[2], value[3]);
+    }
+
     public byte[] byteValue() {
         ByteBuffer buffer = ByteBuffer.allocate(4);
         buffer.put(this.high.byteValue());
