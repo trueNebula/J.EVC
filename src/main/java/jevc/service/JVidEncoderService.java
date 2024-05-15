@@ -4,6 +4,7 @@ import jevc.entities.*;
 import jevc.operations.*;
 import jevc.utils.AVIWriter;
 import jevc.utils.JVidWriter;
+import jevc.utils.ProgressStatus;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -52,8 +53,7 @@ public class JVidEncoderService {
     private final JVidWriter jVidWriter;
     private final String outputFolder;
     private final String outputFile;
-
-    private StringBuilder progressBar;
+    private ProgressStatus progressStatus;
 
     public JVidEncoderService(File[] files, String outfile, String outputFolder) {
         this.files = files;
@@ -63,8 +63,7 @@ public class JVidEncoderService {
         this.aviWriter = new AVIWriter();
         this.jVidWriter = new JVidWriter();
         this.blockBuffer = new BlockBuffer();
-
-        initProgressStatus();
+        this.progressStatus = new ProgressStatus();
 
         DCT = new DiscreteCosineTransform();
         int DEFAULT_QUALITY_FACTOR = 80;
@@ -141,33 +140,33 @@ public class JVidEncoderService {
         // );
 
         // init encoders
-        updateProgressStatus(0, "Initializing Encoders...", frameName);
+        progressStatus.updateProgressStatus(0, "Initializing Encoders...", frameName);
         runlengthEncoder = new RunLengthEncoder();
         huffmanEncoder = new HuffmanEncoder();
 
         // scale and subsample image
-        updateProgressStatus(2, "Subsampling Image...", frameName);
+        progressStatus.updateProgressStatus(2, "Subsampling Image...", frameName);
         frame.ScaleImage();
         //image.PerformSubsampling(YCbCrImage.YUV411Sampling);
         frame.PerformSubsampling(YCbCrImage.YUV444Sampling);
 
         // split frame into blocks
-        updateProgressStatus(5, "Performing block splitting...", frameName);
+        progressStatus.updateProgressStatus(5, "Performing block splitting...", frameName);
         ArrayList<Block> blocks = frame.PerformBlockSplitting();
         RunLengthBlock rleBlock;
 
         // write JPEG header sections
-        updateProgressStatus(8, "Writing frame header...", frameName);
+        progressStatus.updateProgressStatus(8, "Writing frame header...", frameName);
         writeHeaderSections(internalFrameBuffer, frame);
-        updateProgressStatus(10, "Processing blocks...", frameName);
+        progressStatus.updateProgressStatus(10, "Processing blocks...", frameName);
 
         // process each block
         int blockIndex = 0;
         for (Block block: blocks) {
             blockIndex++;
             if (enablePrint) {
-//                updateProgressStatus((int) (10 + ((double) blockIndex / blocks.size() * 100) - 20), "Processing blocks...", frameName);
-                updateProgressStatus((int) ((double) blockIndex / blocks.size() * 100 * 0.9), "Processing blocks...", frameName);
+//                progressStatus.updateProgressStatus((int) (10 + ((double) blockIndex / blocks.size() * 100) - 20), "Processing blocks...", frameName);
+                progressStatus.updateProgressStatus((int) ((double) blockIndex / blocks.size() * 100 * 0.9), "Processing blocks...", frameName);
             }
 //            if (enablePrint) {
 //                System.out.println("YCbCr block:");
@@ -206,7 +205,7 @@ public class JVidEncoderService {
             huffmanEncoder.encode(internalFrameBuffer, rleBlock);
         }
 
-//        updateProgressStatus(90, "Finishing up...", frameName);
+//        progressStatus.updateProgressStatus(90, "Finishing up...", frameName);
 
         // flush buffers
         huffmanEncoder.flushBuffer(internalFrameBuffer);
@@ -217,7 +216,7 @@ public class JVidEncoderService {
 
         // write JPEG trailer section
         writeTrailerSection(internalFrameBuffer);
-        updateProgressStatus(101, "Frame finished!", frameName);
+        progressStatus.updateProgressStatus(101, "Frame finished!", frameName);
 
         aviWriter.writeDataChunk(tempOutputStream, internalFrameBuffer);
         tempOutputStream.flush();
@@ -230,7 +229,7 @@ public class JVidEncoderService {
          InternalFrameBuffer frameOutputBuffer = new InternalFrameBuffer();
 
         // init encoders
-        updateProgressStatus(0, "Initializing Encoders...", frameName);
+        progressStatus.updateProgressStatus(0, "Initializing Encoders...", frameName);
         runlengthEncoder = new RunLengthEncoder();
         huffmanEncoder = new HuffmanEncoder();
 
@@ -262,18 +261,18 @@ public class JVidEncoderService {
 //        frameOutputBuffer.dumpBufferToStream(frameOutputStream);
 
         // scale and subsample image
-        updateProgressStatus(2, "Subsampling Image...", frameName);
+        progressStatus.updateProgressStatus(2, "Subsampling Image...", frameName);
         frame.ScaleImage();
         //image.PerformSubsampling(YCbCrImage.YUV411Sampling);
         frame.PerformSubsampling(YCbCrImage.YUV444Sampling);
 
         // split frame into blocks
-        updateProgressStatus(5, "Performing block splitting...", frameName);
+        progressStatus.updateProgressStatus(5, "Performing block splitting...", frameName);
         ArrayList<Block> blocks = frame.PerformBlockSplitting();
         RunLengthBlock rleBlock;
 
         // process each block
-        updateProgressStatus(10, "Processing blocks...", frameName);
+        progressStatus.updateProgressStatus(10, "Processing blocks...", frameName);
 
         // This is used to determine if we have to write a new codeword for the block
         // pBlockCodeword = mvec => only motion vector is written
@@ -286,8 +285,8 @@ public class JVidEncoderService {
         for (Block block: blocks) {
             blockIndex++;
             if (enablePrint) {
-//                updateProgressStatus((int) (10 + ((double) blockIndex / blocks.size() * 100) - 20), "Processing blocks...", frameName);
-                updateProgressStatus((int) (((double) blockIndex / blocks.size() * 100 * 0.9)), "Processing blocks...", frameName);
+//                progressStatus.updateProgressStatus((int) (10 + ((double) blockIndex / blocks.size() * 100) - 20), "Processing blocks...", frameName);
+                progressStatus.updateProgressStatus((int) (((double) blockIndex / blocks.size() * 100 * 0.9)), "Processing blocks...", frameName);
             }
 
             // I frame => perform DCT, quantization, inverses, push to buffer, proceed to VLC
@@ -354,7 +353,7 @@ public class JVidEncoderService {
             }
         }
 
-//        updateProgressStatus(90, "Finishing up...", frameName);
+//        progressStatus.updateProgressStatus(90, "Finishing up...", frameName);
 //        internalFrameBuffer.write(new DWORD("huff").byteValue());
 
         // flush buffers
@@ -366,7 +365,7 @@ public class JVidEncoderService {
         frameOutputBuffer.dumpBufferToStream(frameOutputStream);
         frameOutputStream.flush();
 
-        updateProgressStatus(100, "Frame finished!", frameName);
+        progressStatus.updateProgressStatus(100, "Frame finished!", frameName);
 
         jVidWriter.writeDataChunk(tempOutputStream, internalFrameBuffer, frameType);
         tempOutputStream.flush();
@@ -739,33 +738,4 @@ public class JVidEncoderService {
         internalFrameBuffer.write(EOI);
         return internalFrameBuffer.size();
     }
-
-    private void initProgressStatus() {
-        this.progressBar = new StringBuilder();
-
-    }
-
-    private void updateProgressStatus(int progress, String status, String frame) {
-        int progressLength = 20;
-        int completedLength = (int) ((double) progress / 100 * progressLength);
-
-        this.progressBar.setLength(0);
-        this.progressBar.append(frame).append(" [");
-        for (int i = 0; i < progressLength; i++) {
-            if (i < completedLength) {
-                this.progressBar.append("-");
-            } else {
-                this.progressBar.append(" ");
-            }
-        }
-
-        this.progressBar.append("] ").append(progress).append("% ").append(status);
-        System.out.print("\r" + this.progressBar);
-
-        if (progress == 100) {
-            System.out.println();
-        }
-
-    }
-
 }
