@@ -1,4 +1,3 @@
-import jevc.entities.Block;
 import jevc.entities.RunLength;
 import jevc.entities.RunLengthBlock;
 import jevc.operations.HuffmanEncoder;
