@@ -51,7 +51,7 @@ public class JVidDecoderService {
         this.huffmanEncoder = new HuffmanEncoder();
         this.jVidWriter = new JVidWriter();
         this.blockBuffer = new BlockBuffer();
-        this.logger = new Logger(true);
+        this.logger = new Logger(true, false, "");
 
         // set jpeg compression parameters
         huffmanEncoder.setSamplingFactors(new int[] {1, 1, 1}, new int[] {1, 1, 1});

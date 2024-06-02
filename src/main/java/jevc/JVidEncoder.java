@@ -22,6 +22,8 @@ public class JVidEncoder {
         String parralelization = "";
         boolean compressToMjpeg = false;
         boolean enableBenchmarking = false;
+        String export = "";
+        boolean isDebug = false;
         boolean isQuiet = false;
 
         // Flags
@@ -48,9 +50,15 @@ public class JVidEncoder {
                         parralelization = args[i+1];
                         i++;
                     }
+                    case 'e' -> {
+                        checkArgument(args[i], args[i+1]);
+                        export = args[i+1];
+                        i++;
+                    }
                     case 'm' -> compressToMjpeg = true;
                     case 'b' -> enableBenchmarking = true;
                     case 'q' -> isQuiet = true;
+                    case 'd' -> isDebug = true;
                     case 'h' -> printHelp();
                 }
             }
@@ -84,7 +92,16 @@ public class JVidEncoder {
             Globals.MAX_HEIGHT = resolution.getHeight();
             Globals.MAX_WIDTH = resolution.getWidth();
 
-            JVidEncoderService encoder = new JVidEncoderService(files, output, parralelization, compressToMjpeg, enableBenchmarking, isQuiet);
+            JVidEncoderService encoder = new JVidEncoderService(
+                    files,
+                    output,
+                    parralelization,
+                    compressToMjpeg,
+                    enableBenchmarking,
+                    export,
+                    isDebug,
+                    isQuiet
+            );
             encoder.compress();
         }
     }
@@ -96,15 +113,19 @@ public class JVidEncoder {
         System.out.println("  -o output: Output folder and file name");
         System.out.println("  -f fps: Framerate");
         System.out.println("  -p types: Use parallelization");
-        System.out.println("    Parallelization types: ");
-        System.out.println("      f: Per-Frame");
-        System.out.println("      g: Per-GOP");
-        System.out.println("      o: Frame Operation");
-        System.out.println("    Usage example: -p fg (Per-Frame and Per-GOP)");
+        System.out.println("  Parallelization options: ");
+        System.out.println("    f: Per-Frame");
+        System.out.println("    g: Per-GOP");
+        System.out.println("    o: Frame Operation");
+        System.out.println("  Usage example: -p fg (Per-Frame and Per-GOP)");
         System.out.println("  -m: Compress to MJPEG");
         System.out.println("  -b: Enable benchmarking");
+        System.out.println("  -e export: Export benchmark");
+        System.out.println("  -d: Create debug frames");
         System.out.println("  -q: Quiet mode");
         System.out.println("  -h: Help");
+        System.out.println("Example: jevc -i inputFolder -o outputFolder/output.jvd -f 30 -p fg -b -q");
+        System.exit(0);
     }
 
     private static void checkArgument(String arg, String nextArg) {

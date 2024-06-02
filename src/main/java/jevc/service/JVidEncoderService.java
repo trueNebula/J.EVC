@@ -1,44 +1,48 @@
 package jevc.service;
 
+import com.google.common.base.Stopwatch;
 import jevc.entities.*;
 import jevc.operations.*;
-import jevc.utils.AVIWriter;
-import jevc.utils.JVidWriter;
-import jevc.utils.JpgWriter;
-import jevc.utils.Logger;
+import jevc.utils.*;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.concurrent.TimeUnit;
 
 public class JVidEncoderService {
+    // I/O
     private final File[] files;
     private final InternalFrameBuffer internalFrameBuffer;
+    private BufferedOutputStream outputStream;
+    private BufferedOutputStream tempOutputStream;
+    private final String outputFolder;
+    private final String outputFile;
+    private final Logger logger;
+
+    // Operations
     private final DiscreteCosineTransform DCT;
     private final Quantizer quantizer;
     private RunLengthEncoder runlengthEncoder;
     private HuffmanEncoder huffmanEncoder;
     private final BlockBuffer blockBuffer;
     private MotionEstimator motionEstimator;
-    private BufferedOutputStream outputStream;
-    private BufferedOutputStream tempOutputStream;
     private final JpgWriter jpgWriter;
     private final AVIWriter aviWriter;
     private final JVidWriter jVidWriter;
-    private final String outputFolder;
-    private final String outputFile;
-    private final Logger logger;
+    private final LapStopwatch stopwatch;
 
     // Flags
     private final boolean compressToMjpeg;
     private final boolean enableBenchmarking;
+    private final boolean isDebug;
     private final boolean perFrame;
     private final boolean perGop;
     private final boolean frameOperation;
 
-    public JVidEncoderService(File[] files, String output, String parallelization, boolean compressToMjpeg, boolean enableBenchmarking, boolean isQuiet) {
+    public JVidEncoderService(File[] files, String output, String parallelization, boolean compressToMjpeg, boolean enableBenchmarking, String export, boolean isDebug, boolean isQuiet) {
         this.files = files;
         this.outputFile = getOutputFile(output);
         this.outputFolder = getOutputFolder(output);
@@ -53,13 +57,16 @@ public class JVidEncoderService {
         this.jVidWriter = new JVidWriter();
         this.blockBuffer = new BlockBuffer();
 
-        // FLAGS
+        this.stopwatch = new LapStopwatch();
+
+        // Flags
         this.compressToMjpeg = compressToMjpeg;
         this.enableBenchmarking = enableBenchmarking;
+        this.isDebug = isDebug;
         this.perFrame = parallelization.contains("f");
         this.perGop = parallelization.contains("g");
         this.frameOperation = parallelization.contains("o");
-        this.logger = new Logger(isQuiet);
+        this.logger = new Logger(isQuiet, enableBenchmarking, export);
 
         try {
             outputStream = new BufferedOutputStream(new FileOutputStream(output));
@@ -100,22 +107,37 @@ public class JVidEncoderService {
                 }
             YCbCrImage frame = new YCbCrImage(pixels, img.getWidth(), img.getHeight());
 
-            // encodeFrameMjpg(frame, f.getName());
-            encodeFrameJvid(frame, frameType, f.getName());
+            stopwatch.reset();
+            stopwatch.start();
+
+            if (this.compressToMjpeg) {
+                encodeFrameMjpg(frame, f.getName());
+            } else {
+                encodeFrameJvid(frame, frameType, f.getName());
+            }
+
+            stopwatch.stop();
+            logger.benchmark(stopwatch, f.getName());
         }
 
 
         logger.log("Writing file header");
-        // aviWriter.writeAVIHeader(outputStream, this.files.length, videoWidth, videoHeight);
-        jVidWriter.writeJvidHeader(outputStream, this.files.length, videoWidth, videoHeight);
+
+        if (this.compressToMjpeg) {
+            aviWriter.writeAVIHeader(outputStream, this.files.length, videoWidth, videoHeight);
+        } else {
+            jVidWriter.writeJvidHeader(outputStream, this.files.length, videoWidth, videoHeight);
+        }
 
         logger.log("File header written, writing frames");
         File temp = new File(outputFolder + "temp/temp");
         Files.copy(temp.toPath(), outputStream);
         outputStream.flush();
 
-        // logger.log("Frames written, writing Idx1");
-        // aviWriter.writeIdx1(outputStream, this.files.length);
+        if (this.compressToMjpeg) {
+            logger.log("Frames written, writing Idx1");
+            aviWriter.writeIdx1(outputStream, this.files.length);
+        }
 
         logger.log("Output file: " + outputFile);
 
@@ -184,17 +206,21 @@ public class JVidEncoderService {
 
         // write JPEG trailer section
         jpgWriter.writeTrailerSection(internalFrameBuffer);
-        logger.updateProgressStatus(101, "Frame finished!", frameName);
+        logger.updateProgressStatus(101, "Finished!", frameName);
 
         aviWriter.writeDataChunk(tempOutputStream, internalFrameBuffer);
         tempOutputStream.flush();
     }
     private void encodeFrameJvid(YCbCrImage frame, char frameType, String frameName) throws IOException {
-        // DEBUG
-         BufferedOutputStream frameOutputStream = new BufferedOutputStream(
-                 new FileOutputStream(outputFolder + frameName.replace(".png", ".jpg"))
-         );
-         InternalFrameBuffer frameOutputBuffer = new InternalFrameBuffer();
+        // debug
+        BufferedOutputStream frameOutputStream = null;
+        InternalFrameBuffer frameOutputBuffer = null;
+        if (isDebug) {
+            frameOutputStream = new BufferedOutputStream(
+                    new FileOutputStream(outputFolder + frameName.replace(".png", ".jpg"))
+            );
+            frameOutputBuffer = new InternalFrameBuffer();
+        }
 
         // init encoders
         logger.updateProgressStatus(0, "Initializing Encoders...", frameName);
@@ -215,6 +241,7 @@ public class JVidEncoderService {
         logger.updateProgressStatus(5, "Performing block splitting...", frameName);
         ArrayList<Block> blocks = frame.PerformBlockSplitting();
         RunLengthBlock rleBlock;
+        stopwatch.lap(TimeUnit.MILLISECONDS);
 
         // process each block
         logger.updateProgressStatus(10, "Processing blocks...", frameName);
@@ -276,10 +303,6 @@ public class JVidEncoderService {
 
                 // quantize DCT coefficients
                 quantizer.quantize(block);
-//                // I have no clue why this step is needed in actual encoders but for this project it results in shitty quality
-//                // inverse quantize and inverse DCT a given block
-//                quantizer.dequantize(savedBlock);
-//                DCT.inverse(savedBlock);
 
                 // save it in a block buffer
                 blockBuffer.save(savedBlock);
@@ -298,21 +321,25 @@ public class JVidEncoderService {
             }
         }
 
+        stopwatch.lap(TimeUnit.MILLISECONDS);
         logger.updateProgressStatus(90, "Finishing up...", frameName);
 
         // flush buffers
         huffmanEncoder.flushBuffer(internalFrameBuffer);
 
-        // DEBUG
-        internalFrameBuffer.dumpBufferToStreamWithoutFlushing(frameOutputStream);
-        jpgWriter.writeTrailerSection(frameOutputBuffer);
-        frameOutputBuffer.dumpBufferToStream(frameOutputStream);
-        frameOutputStream.flush();
+        // debug
+        if (isDebug) {
+            internalFrameBuffer.dumpBufferToStreamWithoutFlushing(frameOutputStream);
+            jpgWriter.writeTrailerSection(frameOutputBuffer);
+            frameOutputBuffer.dumpBufferToStream(frameOutputStream);
+            frameOutputStream.flush();
+        }
 
-        logger.updateProgressStatus(100, "Frame finished!", frameName);
+        logger.updateProgressStatus(100, "Finished!", frameName);
 
         jVidWriter.writeDataChunk(tempOutputStream, internalFrameBuffer, frameType);
         tempOutputStream.flush();
+        stopwatch.lap(TimeUnit.MILLISECONDS);
     }
 
     private static String getOutputFile(String filePath) {
