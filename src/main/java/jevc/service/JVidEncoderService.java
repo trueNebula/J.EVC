@@ -45,7 +45,6 @@ public class JVidEncoderService {
     private final Quantizer quantizer;
     private RunLengthEncoder runlengthEncoder;
     private HuffmanEncoder huffmanEncoder;
-    private ExponentialGolombEncoder exponentialGolombEncoder;
     private final BlockBuffer blockBuffer;
     private MotionEstimator motionEstimator;
     private BufferedOutputStream outputStream;
@@ -54,7 +53,7 @@ public class JVidEncoderService {
     private final JVidWriter jVidWriter;
     private final String outputFolder;
     private final String outputFile;
-    private ProgressStatus progressStatus;
+    private final ProgressStatus progressStatus;
 
     public JVidEncoderService(File[] files, String outfile, String outputFolder) {
         this.files = files;
@@ -80,7 +79,6 @@ public class JVidEncoderService {
     }
 
     public void compress() throws IOException {
-//        System.setOut(new PrintStream(new BufferedOutputStream(new FileOutputStream("log.txt"))));
         System.out.println("Starting encoding");
 
         DWORD videoWidth = new DWORD(0);
@@ -111,13 +109,8 @@ public class JVidEncoderService {
                 }
             YCbCrImage frame = new YCbCrImage(pixels, img.getWidth(), img.getHeight());
 
-            // encodeFrameMjpg(frame, true, f.getName());
-            encodeFrameJvid(frame, frameType, true, f.getName());
-
-//            if (frameType == 'P') {
-//                break;
-//            }
-            // encodeFrameMpeg(frame, frameType, true, f.getName());
+            // encodeFrameMjpg(frame, f.getName());
+            encodeFrameJvid(frame, frameType, f.getName());
         }
 
 
@@ -137,7 +130,7 @@ public class JVidEncoderService {
 
     }
 
-    private void encodeFrameMjpg(YCbCrImage frame, boolean enablePrint, String frameName) throws IOException {
+    private void encodeFrameMjpg(YCbCrImage frame, String frameName) throws IOException {
         // DEBUG
         // BufferedOutputStream frameOutputStream = new BufferedOutputStream(
         //         new FileOutputStream(outputFolder + f.getName().replace(".png", ".jpg"))
@@ -168,28 +161,13 @@ public class JVidEncoderService {
         int blockIndex = 0;
         for (Block block: blocks) {
             blockIndex++;
-            if (enablePrint) {
-//                progressStatus.updateProgressStatus((int) (10 + ((double) blockIndex / blocks.size() * 100) - 20), "Processing blocks...", frameName);
-                progressStatus.updateProgressStatus((int) ((double) blockIndex / blocks.size() * 100 * 0.9), "Processing blocks...", frameName);
-            }
-//            if (enablePrint) {
-//                System.out.println("YCbCr block:");
-//                block.print();
-//            }
+            progressStatus.updateProgressStatus((int) ((double) blockIndex / blocks.size() * 100 * 0.9), "Processing blocks...", frameName);
 
             // perform DCT
             DCT.forward(block);
-//            if (enablePrint) {
-//                System.out.println("DCT block:");
-//                block.print();
-//            }
 
             // quantize DCT coefficients
             quantizer.quantize(block);
-//            if (enablePrint) {
-//                System.out.println("Quantized block:");
-//                block.print();
-//            }
 
             // inverse quantize and inverse DCT a given block
             Block savedBlock = block.getCopy();
@@ -202,18 +180,13 @@ public class JVidEncoderService {
 
             // VLC encode block
             rleBlock = runlengthEncoder.encode(block);
-//            if (enablePrint) {
-//                rleBlock.print();
-//            }
-
             huffmanEncoder.encode(internalFrameBuffer, rleBlock);
         }
 
-//        progressStatus.updateProgressStatus(90, "Finishing up...", frameName);
+        progressStatus.updateProgressStatus(90, "Finishing up...", frameName);
 
         // flush buffers
         huffmanEncoder.flushBuffer(internalFrameBuffer);
-//        blockBuffer.flush();
 
         // DEBUG
         // internalFrameBuffer.dumpBufferToStreamWithoutFlushing(frameOutputStream);
@@ -225,7 +198,7 @@ public class JVidEncoderService {
         aviWriter.writeDataChunk(tempOutputStream, internalFrameBuffer);
         tempOutputStream.flush();
     }
-    private void encodeFrameJvid(YCbCrImage frame, char frameType, boolean enablePrint, String frameName) throws IOException {
+    private void encodeFrameJvid(YCbCrImage frame, char frameType, String frameName) throws IOException {
         // DEBUG
          BufferedOutputStream frameOutputStream = new BufferedOutputStream(
                  new FileOutputStream(outputFolder + frameName.replace(".png", ".jpg"))
@@ -240,33 +213,6 @@ public class JVidEncoderService {
             runlengthEncoder = new RunLengthEncoder('P');
         }
         huffmanEncoder = new HuffmanEncoder();
-
-
-        // DEGUG
-        // This is a massive fucking mess because we dont have any proper way of testing yet
-        // TODO: ADD JUNIT SUPPORT AND FUCKING TEST SHIT SEPARATELY
-        // this essentially proves that we can decode a single huffman code at once
-        // it also finds the EOB byte and correctly stops
-        // finally, we now need to ensure the following structure for the bitstream:
-        // mvec (1 byte) hufBlock (1 byte) EOB (1 byte)
-        // so 3 bytes per block totalling up to a whopping ~300KB/frame
-        // for reference, jpeg-ing them results in 130KB/frame
-        // incredible but at least it would work so idc
-//        RunLengthBlock rleBlock1 = new RunLengthBlock();
-//        rleBlock1.setType('U');
-//        ArrayList<RunLength> rleData = new ArrayList<>();
-//        rleData.add(new RunLength(-1, 0, 0));
-//        rleData.add(new RunLength(0, 0, 0));
-//        rleBlock1.setData(rleData);
-//        huffmanEncoder.encode(frameOutputBuffer, rleBlock1);
-//        huffmanEncoder.flushBuffer(frameOutputBuffer);
-//        RunLengthBlock rleBlock12 = new RunLengthBlock();
-//        rleBlock12.setType('Y');
-//        huffmanEncoder.noOfBitsLeftInCurrentByte = 8;
-//        huffmanEncoder.decodeBlock(new byte[]{(byte)0b11100000, (byte)0b101000, (byte)0b0, (byte)0b101000,}, rleBlock12);
-//        rleBlock12.print();
-//        writeHeaderSections(frameOutputBuffer, frame);
-//        frameOutputBuffer.dumpBufferToStream(frameOutputStream);
 
         // scale and subsample image
         progressStatus.updateProgressStatus(2, "Subsampling Image...", frameName);
@@ -292,10 +238,7 @@ public class JVidEncoderService {
         int blockIndex = 0;
         for (Block block: blocks) {
             blockIndex++;
-            if (enablePrint) {
-//                progressStatus.updateProgressStatus((int) (10 + ((double) blockIndex / blocks.size() * 100) - 20), "Processing blocks...", frameName);
-                progressStatus.updateProgressStatus((int) (((double) blockIndex / blocks.size() * 100 * 0.9)), "Processing blocks...", frameName);
-            }
+            progressStatus.updateProgressStatus((int) (((double) blockIndex / blocks.size() * 100 * 0.9)), "Processing blocks...", frameName);
 
             // I frame => perform DCT, quantization, inverses, push to buffer, proceed to VLC
             // P frame => search in block buffer, estimate motion, subtract, perform DCT, quantization,
@@ -305,10 +248,6 @@ public class JVidEncoderService {
 
                 // look through block buffer for the most similar block
                 Block similarBlock = blockBuffer.getSimilarBlock(block);
-
-                if (blockIndex == 10013) {
-//                    System.out.println("puase");
-                }
 
                 // compute motion vector
                 MotionVector motionVector = motionEstimator.computeMotionVector(block, similarBlock);
@@ -336,11 +275,6 @@ public class JVidEncoderService {
                     // codeword changed, write it
                     internalFrameBuffer.write(new DWORD(pBlockCodeword).byteValue());
                 }
-//                if (pBlockCodeword.equals("errb")) {
-//                    System.out.println(motionVector.byteValue());
-//                    block.print();
-//                }
-
                 internalFrameBuffer.write(motionVector.byteValue());
             } else if (frameType == 'I'){
                 // save a copy in the block buffer
@@ -363,8 +297,6 @@ public class JVidEncoderService {
             if (frameType == 'I') {
                 // VLC encode block
                 rleBlock = runlengthEncoder.encode(block);
-//                internalFrameBuffer.write(new DWORD("erbk").byteValue());
-//                internalFrameBuffer.reset();
                 huffmanEncoder.encode(internalFrameBuffer, rleBlock);
             } else if (frameType == 'P' && !block.isEmpty()) {
                 // VLC encode block
@@ -375,8 +307,7 @@ public class JVidEncoderService {
             }
         }
 
-//        progressStatus.updateProgressStatus(90, "Finishing up...", frameName);
-//        internalFrameBuffer.write(new DWORD("huff").byteValue());
+        progressStatus.updateProgressStatus(90, "Finishing up...", frameName);
 
         // flush buffers
         huffmanEncoder.flushBuffer(internalFrameBuffer);
@@ -391,140 +322,6 @@ public class JVidEncoderService {
 
         jVidWriter.writeDataChunk(tempOutputStream, internalFrameBuffer, frameType);
         tempOutputStream.flush();
-    }
-
-    // UNUSED
-    private void encodeFrameMpeg(YCbCrImage frame, char frameType, boolean enablePrint, String frameName) throws IOException {
-        // init encoders
-        runlengthEncoder = new RunLengthEncoder();
-        huffmanEncoder = new HuffmanEncoder();
-        exponentialGolombEncoder = new ExponentialGolombEncoder();
-
-        // scale and subsample image
-        frame.ScaleImage();
-        //image.PerformSubsampling(YCbCrImage.YUV411Sampling);
-        frame.PerformSubsampling(YCbCrImage.YUV444Sampling);
-
-        // split frame into blocks
-        ArrayList<Block> blocks = frame.PerformBlockSplitting();
-//            System.out.println(Arrays.deepToString(blocks.get(0).getData()));
-        RunLengthBlock rleBlock;
-        ExponentialGolombBlock egBlock;
-
-        // write JPEG header sections (REMOVE THIS)
-        writeHeaderSections(internalFrameBuffer, frame);
-
-        // process each block
-        for (Block block: blocks) {
-            // I frame => perform DCT, quantization, inverses, push to buffer, proceed to VLC
-            // P frame => search in block buffer, estimate motion, subtract, perform DCT, quantization,
-            //            proceed to VLC
-            if (frameType == 'P') {
-                motionEstimator = new MotionEstimator();
-                // skip to motion estimation
-                // look through block buffer for the most similar block
-                Block similarBlock = blockBuffer.getSimilarBlock(block);
-                // compute motion vector
-//                    int[] motionVector = motionEstimator.computeMotionVector(block, similarBlock);
-                // subtract found block from input block
-                block.subtract(similarBlock);
-                // perform DCT
-                DCT.forward(block);
-                // quantize DCT coefficients
-                quantizer.quantize(block);
-                // write to buffer
-                // send motion vector to VLC
-
-                // write to buffer
-            } else if (frameType == 'I'){
-                if (enablePrint) {
-                    System.out.println("YCbCr block:");
-                    block.print();
-                }
-
-                // perform DCT
-                DCT.forward(block);
-                if (enablePrint) {
-                    System.out.println("DCT block:");
-                    block.print();
-                }
-
-                // quantize DCT coefficients
-                quantizer.quantize(block);
-                if (enablePrint) {
-                    System.out.println("Quantized block:");
-                    block.print();
-                }
-
-                // inverse quantize and inverse DCT a given block
-                Block savedBlock = block.getCopy();
-                quantizer.dequantize(savedBlock);
-                DCT.inverse(savedBlock);
-
-                // save it in a block buffer
-                blockBuffer.save(savedBlock);
-                // proceed to VLC
-            }
-
-            // VLC encode block
-//                rleBlock = runlengthEncoder.encode(block);
-            egBlock = exponentialGolombEncoder.encodeBlock(block);
-            if (enablePrint) {
-                egBlock.print();
-            }
-//                huffmanEncoder.encode(frameOutputStream, rleBlock);
-            outputStream.write(egBlock.toString().getBytes());
-        }
-
-        // flush buffers
-        huffmanEncoder.flushBuffer(internalFrameBuffer);
-//        blockBuffer.flush();
-
-        // write JPEG trailer section (REMOVE THIS)
-        int frameLength = writeTrailerSection(internalFrameBuffer);
-
-    }
-
-    // UNUSED
-    private int preEncodeFrame(BufferedImage image) throws IOException {
-        runlengthEncoder = new RunLengthEncoder();
-        huffmanEncoder = new HuffmanEncoder();
-        exponentialGolombEncoder = new ExponentialGolombEncoder();
-
-        int[][] pixels = new int[image.getHeight()][image.getWidth()];
-
-        for (int i = 0; i < image.getHeight(); i++)
-            for(int j = 0; j < image.getWidth(); j++) {
-                pixels[i][j] = image.getRGB(j, i);
-            }
-
-        YCbCrImage frame = new YCbCrImage(pixels, image.getWidth(), image.getHeight());
-        frame.ScaleImage();
-        //image.PerformSubsampling(YCbCrImage.YUV411Sampling);
-        frame.PerformSubsampling(YCbCrImage.YUV444Sampling);
-        ArrayList<Block> blocks = frame.PerformBlockSplitting();
-        RunLengthBlock rleBlock;
-
-
-        writeHeaderSections(internalFrameBuffer, frame);
-
-        for (Block block: blocks) {
-            DCT.forward(block);
-            quantizer.quantize(block);
-            rleBlock = runlengthEncoder.encode(block);
-            huffmanEncoder.encode(internalFrameBuffer, rleBlock);
-        }
-
-        huffmanEncoder.flushBuffer(internalFrameBuffer);
-
-        // CACHE
-        BufferedOutputStream frameOutputStream = new BufferedOutputStream(
-                new FileOutputStream(outputFolder + "temp/temp.jpg")
-        );
-        internalFrameBuffer.dumpBufferToStreamWithoutFlushing(frameOutputStream);
-        frameOutputStream.flush();
-
-        return writeTrailerSection(internalFrameBuffer);
     }
 
     private void writeHeaderSections(InternalFrameBuffer internalFrameBuffer, YCbCrImage frame) throws IOException {
