@@ -4,11 +4,10 @@ import jevc.entities.*;
 import jevc.operations.*;
 import jevc.utils.ByteConverter;
 import jevc.utils.JVidWriter;
-import jevc.utils.ProgressStatus;
+import jevc.utils.Logger;
 
 import java.io.*;
 import java.util.ArrayList;
-import java.util.Stack;
 
 public class JVidDecoderService {
     private int bitstreamSize;
@@ -28,7 +27,7 @@ public class JVidDecoderService {
     private MotionEstimator motionEstimator;
 
     private final JVidWriter jVidWriter;
-    private ProgressStatus progressStatus;
+    private Logger logger;
 
 //    private ImageComponent[] imageComponents;
     private int YMCUIndex, CbMCUIndex, CrMCUIndex;
@@ -52,7 +51,7 @@ public class JVidDecoderService {
         this.huffmanEncoder = new HuffmanEncoder();
         this.jVidWriter = new JVidWriter();
         this.blockBuffer = new BlockBuffer();
-        this.progressStatus = new ProgressStatus();
+        this.logger = new Logger(true);
 
         // set jpeg compression parameters
         huffmanEncoder.setSamplingFactors(new int[] {1, 1, 1}, new int[] {1, 1, 1});
@@ -195,10 +194,7 @@ public class JVidDecoderService {
 
                             // Reconstruct block
                             int[] offset = motionVector.decompress();
-                            if (xPos + offset[0] * 8 == -24) {
-//                                System.out.println("aaaaa");
 
-                            }
                             block = blockBuffer.getBlock(xPos + offset[0] * 8, yPos + offset[1] * 8, blockType);
                             blocks.add(block);
 
@@ -216,9 +212,7 @@ public class JVidDecoderService {
                         case "errb" -> {
                             // First byte is the motion vector
                             MotionVector motionVector = new MotionVector(stack.pop());
-                            if (blocks.size() == 62541) {
-//                                System.out.println("woopise incoming");
-                            }
+
                             // Get the rest of the chunk
                             // Chunk is until FF FF
                             byte[] buffer = new byte[1000];
@@ -237,7 +231,6 @@ public class JVidDecoderService {
 
                             // Some chunks are empty
 
-
                             // Huffman Decode
                             huffmanEncoder.decodeBlock(chunk, rleBlock);
 
@@ -250,11 +243,9 @@ public class JVidDecoderService {
                                 rleData.add(new RunLength(0, 0, 0));
                                 rleBlock.setData(rleData);
                             }
-//                            rleBlock.print();
 
                             // RL Decode
                             block = runLengthEncoder.decode(rleBlock);
-//                            int[] pos = computeNextBlockPosition(block.getType());
                             block.setPos(xPos, yPos);
 
                             //Dequantize
@@ -267,9 +258,6 @@ public class JVidDecoderService {
                             int[] offset = motionVector.decompress();
                             block.add(blockBuffer.getBlock(xPos + offset[0] * 8, yPos + offset[1] * 8, blockType));
 
-                            if (block.getPosY() == 1088) {
-//                                System.out.println("what");
-                            }
                             blocks.add(block);
 
                             // Update Next Block Data

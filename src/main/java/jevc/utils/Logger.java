@@ -1,13 +1,31 @@
 package jevc.utils;
 
-public class ProgressStatus {
+public class Logger {
     private final StringBuilder progressBar;
+    private boolean isQuiet = false;
 
-    public ProgressStatus() {
+    public Logger(boolean isQuiet) {
         this.progressBar = new StringBuilder();
+        this.isQuiet = isQuiet;
+    }
+
+    public void log(String message) {
+        if (this.isQuiet) {
+            return;
+        }
+
+        System.out.println(message);
+    }
+
+    public void error(String message) {
+        System.err.println(message);
     }
 
     public void updateProgressStatus(int progress, String status, String frame) {
+        if (this.isQuiet) {
+            return;
+        }
+
         int progressLength = 20;
         int completedLength = (int) ((double) progress / 100 * progressLength);
 
