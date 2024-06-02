@@ -14,6 +14,10 @@ public class MotionVector {
         this.byteVal = (byte) (((x / 8) & 0x0F) << 4 | ((y / 8) & 0x0F));
     }
 
+    public MotionVector(byte byteVal) {
+        this.byteVal = byteVal;
+    }
+
     public byte byteValue() {
        return this.byteVal;
     }
@@ -23,6 +27,9 @@ public class MotionVector {
         // We need to decompress it to get the original x and y values
         int x = (byteVal >> 4) & 0x0F;
         int y = byteVal & 0x0F;
+
+        if (x > 7) x -= 16;
+        if (y > 7) y -= 16;
 
         return new int[]{x, y};
     }

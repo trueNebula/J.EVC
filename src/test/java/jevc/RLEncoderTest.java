@@ -10,9 +10,9 @@ import java.util.Arrays;
 public class RLEncoderTest extends TestCase {
     private RunLengthEncoder runLengthEncoder;
     public void testEncode() {
-        runLengthEncoder = new RunLengthEncoder();
+        runLengthEncoder = new RunLengthEncoder('P');
         int[][] data1 = new int[][] {
-                {-63, 0, 0, 0, 0, 0, 0, 0},
+                {-64, 0, 0, 0, 0, 0, 0, 0},
                 {0, 0, 0, 0, 0, 0, 0, 0,},
                 {0, 0, 0, 0, 0, 0, 0, 0,},
                 {0, 0, 0, 0, 0, 0, 0, 0,},

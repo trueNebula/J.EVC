@@ -141,7 +141,6 @@ public class JVidWriter {
         // total size = 28 + (12 + frame size) * frameCount = 28 + size + 12 * frameCount
 
         int size = frameLengthBuffer.stream().reduce(0, Integer::sum);
-        System.out.println(28 + size);
         return new DWORD(28 + size);
     }
 }

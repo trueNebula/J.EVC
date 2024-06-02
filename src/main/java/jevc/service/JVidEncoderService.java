@@ -1,5 +1,6 @@
 package jevc.service;
 
+import com.google.common.base.Stopwatch;
 import jevc.entities.*;
 import jevc.operations.*;
 import jevc.utils.AVIWriter;
@@ -112,6 +113,10 @@ public class JVidEncoderService {
 
             // encodeFrameMjpg(frame, true, f.getName());
             encodeFrameJvid(frame, frameType, true, f.getName());
+
+//            if (frameType == 'P') {
+//                break;
+//            }
             // encodeFrameMpeg(frame, frameType, true, f.getName());
         }
 
@@ -229,7 +234,11 @@ public class JVidEncoderService {
 
         // init encoders
         progressStatus.updateProgressStatus(0, "Initializing Encoders...", frameName);
-        runlengthEncoder = new RunLengthEncoder();
+        if (frameType == 'I') {
+            runlengthEncoder = new RunLengthEncoder();
+        } else if (frameType == 'P') {
+            runlengthEncoder = new RunLengthEncoder('P');
+        }
         huffmanEncoder = new HuffmanEncoder();
 
 
@@ -297,6 +306,10 @@ public class JVidEncoderService {
                 // look through block buffer for the most similar block
                 Block similarBlock = blockBuffer.getSimilarBlock(block);
 
+                if (blockIndex == 10013) {
+//                    System.out.println("puase");
+                }
+
                 // compute motion vector
                 MotionVector motionVector = motionEstimator.computeMotionVector(block, similarBlock);
 
@@ -323,6 +336,10 @@ public class JVidEncoderService {
                     // codeword changed, write it
                     internalFrameBuffer.write(new DWORD(pBlockCodeword).byteValue());
                 }
+//                if (pBlockCodeword.equals("errb")) {
+//                    System.out.println(motionVector.byteValue());
+//                    block.print();
+//                }
 
                 internalFrameBuffer.write(motionVector.byteValue());
             } else if (frameType == 'I'){
@@ -343,12 +360,18 @@ public class JVidEncoderService {
                 blockBuffer.save(savedBlock);
             }
 
-            if (frameType == 'I' || (frameType == 'P' && !block.isEmpty())) {
+            if (frameType == 'I') {
                 // VLC encode block
                 rleBlock = runlengthEncoder.encode(block);
 //                internalFrameBuffer.write(new DWORD("erbk").byteValue());
 //                internalFrameBuffer.reset();
                 huffmanEncoder.encode(internalFrameBuffer, rleBlock);
+            } else if (frameType == 'P' && !block.isEmpty()) {
+                // VLC encode block
+                rleBlock = runlengthEncoder.encode(block);
+                huffmanEncoder.encode(internalFrameBuffer, rleBlock);
+                // EOB
+                internalFrameBuffer.write(new WORD((byte) 255, (byte) 255).byteValue());
             }
         }
 

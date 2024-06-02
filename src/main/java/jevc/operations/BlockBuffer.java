@@ -75,6 +75,20 @@ public class BlockBuffer {
         return currentMinMSEBlock;
     }
 
+    public Block getBlock(int x, int y, int type) {
+        char blockType = 'Y';
+        switch (type) {
+            case 0 -> {
+            }
+            case 1 -> blockType = 'U';
+            case 2 -> blockType = 'V';
+        }
+        if (y == 1088) {
+            System.out.println("woops");
+        }
+        return buffer.get(blockType)[y / 8][x / 8];
+    }
+
     private double computeMeanSquaredError(Block A, Block B) {
         double MSE = 0.0;
         int[] aData = Stream.of(A.getData())

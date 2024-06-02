@@ -27,4 +27,11 @@ public class ByteConverter {
         file.readFully(buffer, 0, 4);
         return new DWORD(buffer);
     }
+
+    public static byte[] trim(byte[] buffer, int length) {
+        byte[] result = new byte[length];
+        System.arraycopy(buffer, 0, result, 0, length);
+        return result;
+    }
+
 }

@@ -6,6 +6,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Objects;
 
 public class YCbCrImage {
     public int[][] Y;
@@ -69,14 +70,24 @@ public class YCbCrImage {
         Cr = new int[height][width];
         int[][] data;
 
-        for (Block block : blocks) {
+        for (int k = 0; k < blocks.size(); k++) {
+            Block block = blocks.get(k);
+//            if (k == 9363) {
+//                System.out.println("this is bad!");
+//
+//            }
+//
 //            System.out.println("Adding block " + block.getType() + " with positions " +
 //                    "[posY=" + block.getPosY() + ", posX=" + block.getPosX() + "] to the image ..");
+
             switch (block.getType()) {
                 case 'Y' -> {
                     data = block.getData();
                     for (int i = 0; i < 8; i++) {
                         for (int j = 0; j < 8; j++) {
+                            if (block.getPosY() + i == 1088) {
+//                                System.out.println('a');
+                            }
                             Y[block.getPosY() + i][block.getPosX() + j] = data[i][j];
                         }
                     }

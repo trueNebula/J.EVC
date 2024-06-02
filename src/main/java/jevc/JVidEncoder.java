@@ -16,7 +16,7 @@ public class JVidEncoder {
             System.out.println("Run the program: java jevc.JVidEncoder folder fps");
         }
 
-        String fileName = "output";
+        String fileName = "output4";
         String outputFolder = args[0] + "/compressed/";
         String outputfile = outputFolder + fileName + ".jvd";
         File[] files = null;
@@ -33,6 +33,7 @@ public class JVidEncoder {
         }
 
         if (!Objects.isNull(files)) {
+            System.out.println("Files: " + Arrays.toString(files));
             BufferedImage resolution = ImageIO.read(files[0]);
             Globals.MAX_HEIGHT = resolution.getHeight();
             Globals.MAX_WIDTH = resolution.getWidth();

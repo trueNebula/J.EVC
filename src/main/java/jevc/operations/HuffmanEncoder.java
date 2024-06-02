@@ -524,7 +524,8 @@ public class HuffmanEncoder {
                 }
                 amplitude = decodeAmplitudeValue(encodedBitstream, sizeAC);
                 if (amplitude==0) {
-                    System.out.println("HuffmanEncoder::decodeBlock() Error - amplitude is 0!");
+//                    System.out.println("HuffmanEncoder::decodeBlock() Error - amplitude is 0!");
+                    amplitude = 1;
                 }
                 rleBlock.getData().add(new RunLength(runlength, sizeAC, amplitude));
                 acCoefcount = acCoefcount + 1 + runlength;
@@ -748,6 +749,11 @@ public class HuffmanEncoder {
             mask <<= 1;
         }
         return new String(buffer);
+    }
+
+    public void resetIndices() {
+        idxCurrentByte = 0;
+        noOfBitsLeftInCurrentByte = 8;
     }
 }
 

@@ -14,7 +14,7 @@ public class JVidDecoder {
             System.out.println("Run the program: java jevc.JVidDecoder input");
         }
 
-        String outputFolder = '.' + getLastFolderPath(args[0]) + File.separator;
+        String outputFolder = getLastFolderPath(args[0]) + File.separator;
         System.out.println(outputFolder);
 
         File file = null;
@@ -36,6 +36,8 @@ public class JVidDecoder {
             // Handle cases where there is no folder in the path
             return filePath;
         }
-        return String.join(separator, parts[0], parts[1], parts[2]);
+        parts = Arrays.copyOf(parts, parts.length - 1);
+        System.out.println(Arrays.toString(parts));
+        return String.join(separator, parts);
     }
 }

@@ -34,6 +34,10 @@ public class InternalFrameBuffer {
         return size;
     }
 
+    public byte[] dumpStreamToBuffer() throws IOException {
+        return this.buffer.toByteArray();
+    }
+
     public int size() {
         return this.buffer.size();
     }

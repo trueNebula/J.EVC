@@ -38,4 +38,13 @@ public class RunLengthBlock {
         if ((type!='Y') && (type!='U') && (type!='V')) return;
         this.type = type;
     }
+
+    public void setType(int type) {
+//        System.out.print("Type: " + type + " ");
+        switch (type) {
+            case 0 -> this.type = 'Y';
+            case 1 -> this.type = 'U';
+            case 2 -> this.type = 'V';
+        }
+    }
 }

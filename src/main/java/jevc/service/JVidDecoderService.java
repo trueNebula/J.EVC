@@ -8,6 +8,7 @@ import jevc.utils.ProgressStatus;
 
 import java.io.*;
 import java.util.ArrayList;
+import java.util.Stack;
 
 public class JVidDecoderService {
     private int bitstreamSize;
@@ -29,18 +30,18 @@ public class JVidDecoderService {
     private final JVidWriter jVidWriter;
     private ProgressStatus progressStatus;
 
-    private ImageComponent[] imageComponents;
+//    private ImageComponent[] imageComponents;
     private int YMCUIndex, CbMCUIndex, CrMCUIndex;
     private int YinnerMCUIdx, CbinnerMCUIdx, CrinnerMCUIdx;
-
-    int[] Huffman_bits_dc_luminance = new int[17];
-    int[] Huffman_bits_dc_chrominance = new int[17];
-    int[] Huffman_bits_ac_luminance = new int[17];
-    int[] Huffman_bits_ac_chrominance = new int[17];
-    int[] Huffman_vals_dc_luminance = new int[12];
-    int[] Huffman_vals_dc_chrominance = new int[12];
-    int[] Huffman_vals_ac_luminance = new int[162];
-    int[] Huffman_vals_ac_chrominance = new int[162];
+//
+//    int[] Huffman_bits_dc_luminance = new int[17];
+//    int[] Huffman_bits_dc_chrominance = new int[17];
+//    int[] Huffman_bits_ac_luminance = new int[17];
+//    int[] Huffman_bits_ac_chrominance = new int[17];
+//    int[] Huffman_vals_dc_luminance = new int[12];
+//    int[] Huffman_vals_dc_chrominance = new int[12];
+//    int[] Huffman_vals_ac_luminance = new int[162];
+//    int[] Huffman_vals_ac_chrominance = new int[162];
 
     public JVidDecoderService(File file, String outputFolder) throws FileNotFoundException {
         this.file = file;
@@ -55,10 +56,10 @@ public class JVidDecoderService {
 
         // set jpeg compression parameters
         huffmanEncoder.setSamplingFactors(new int[] {1, 1, 1}, new int[] {1, 1, 1});
-        Huffman_bits_dc_luminance[0] = 0x00;
-        Huffman_bits_dc_chrominance[0] = 0x01;
-        Huffman_bits_ac_luminance[0] = 0x10;
-        Huffman_bits_ac_chrominance[0] = 0x11;
+//        Huffman_bits_dc_luminance[0] = 0x00;
+//        Huffman_bits_dc_chrominance[0] = 0x01;
+//        Huffman_bits_ac_luminance[0] = 0x10;
+//        Huffman_bits_ac_chrominance[0] = 0x11;
 //        huffmanEncoder.initializeHuffmanTables(
 //                Huffman_bits_dc_luminance, Huffman_bits_dc_chrominance, Huffman_bits_ac_luminance, Huffman_bits_ac_chrominance,
 //                Huffman_vals_dc_luminance, Huffman_vals_dc_chrominance, Huffman_vals_ac_luminance, Huffman_vals_ac_chrominance
@@ -135,7 +136,11 @@ public class JVidDecoderService {
 
     private void processFrame(byte[] data, String type, int chunkSize, int index) throws IOException {
         // Process the data chunk => frame
-        runLengthEncoder = new RunLengthEncoder();
+        char frametype = 'I';
+        if (type.equals("inte")) {
+            frametype = 'P';
+        }
+        runLengthEncoder = new RunLengthEncoder(frametype);
         ArrayList<RunLengthBlock> rleBlocksArray;
         ArrayList<Block> blocks = new ArrayList<>();
         Block block;
@@ -161,21 +166,127 @@ public class JVidDecoderService {
                 // IDCT
                 DCT.inverse(block);
 
-                blocks.add(block);
-
                 // Add to block buffer
+                blocks.add(block);
                 blockBuffer.save(block);
             }
 
         } else {
             // inte => P-frame -> motion compensation
-            //            -> Parse codeword change
-            //            -> Obtain motion vector
-            //            -> Huffman Decode Error
-            //            -> RL Decode Error
-            //            -> Dequantize Error
-            //            -> IDCT Error
-            //            -> Motion Compensation
+            // Parse codeword change
+            String codeword = "";
+            int xPos = 0, yPos = 0, blockType = 0;
+
+            ByteStack stack = new ByteStack(data, chunkSize+1);
+            huffmanEncoder.resetIndices();
+
+            while (!stack.isEmpty()) {
+                // Check if next 4 bytes are a codeword
+                String topFourBytes = new String(stack.peek(4), 0, 4);
+
+                if (topFourBytes.equals("mvec") || topFourBytes.equals("errb")) {
+                    codeword = new String(stack.pop(4), 0, 4);
+                } else {
+                    // Based on the codeword, read the next bytes
+                    switch (codeword) {
+                        case "mvec" -> {
+                            // Read the motion vector
+                            MotionVector motionVector = new MotionVector(stack.pop());
+
+                            // Reconstruct block
+                            int[] offset = motionVector.decompress();
+                            if (xPos + offset[0] * 8 == -24) {
+//                                System.out.println("aaaaa");
+
+                            }
+                            block = blockBuffer.getBlock(xPos + offset[0] * 8, yPos + offset[1] * 8, blockType);
+                            blocks.add(block);
+
+                            // Update Next Block Data
+                            blockType += 1;
+                            if (blockType == 3) {
+                                blockType = 0;
+                                xPos += 8;
+                                if (xPos == Globals.MAX_WIDTH) {
+                                    xPos = 0;
+                                    yPos = (yPos + 8);
+                                }
+                            }
+                        }
+                        case "errb" -> {
+                            // First byte is the motion vector
+                            MotionVector motionVector = new MotionVector(stack.pop());
+                            if (blocks.size() == 62541) {
+//                                System.out.println("woopise incoming");
+                            }
+                            // Get the rest of the chunk
+                            // Chunk is until FF FF
+                            byte[] buffer = new byte[1000];
+                            int bufferIndex = 0;
+                            while (!stack.peekForEOB()) {
+                                buffer[bufferIndex++] = stack.pop();
+                            }
+                            stack.pop(2);
+                            byte[] chunk = new byte[bufferIndex];
+                            System.arraycopy(buffer, 0, chunk, 0, bufferIndex);
+
+                            // Following byte(s) are the huffman encoded error block
+                            RunLengthBlock rleBlock = new RunLengthBlock();
+                            rleBlock.setType(blockType);
+                            huffmanEncoder.resetIndices();
+
+                            // Some chunks are empty
+
+
+                            // Huffman Decode
+                            huffmanEncoder.decodeBlock(chunk, rleBlock);
+
+                            // Add End-Of-Block symbol
+                            ArrayList<RunLength> rleData = rleBlock.getData();
+                            if (!rleData.isEmpty() && (
+                                    rleData.get(rleData.size() - 1).getRunlength() != 0 ||
+                                    rleData.get(rleData.size() - 1).getSize() != 0 ||
+                                    rleData.get(rleData.size() - 1).getAmplitude() != 0)) {
+                                rleData.add(new RunLength(0, 0, 0));
+                                rleBlock.setData(rleData);
+                            }
+//                            rleBlock.print();
+
+                            // RL Decode
+                            block = runLengthEncoder.decode(rleBlock);
+//                            int[] pos = computeNextBlockPosition(block.getType());
+                            block.setPos(xPos, yPos);
+
+                            //Dequantize
+                            quantizer.dequantize(block);
+
+                            // IDCT
+                            DCT.inverse(block);
+
+                            // Reconstruct block
+                            int[] offset = motionVector.decompress();
+                            block.add(blockBuffer.getBlock(xPos + offset[0] * 8, yPos + offset[1] * 8, blockType));
+
+                            if (block.getPosY() == 1088) {
+//                                System.out.println("what");
+                            }
+                            blocks.add(block);
+
+                            // Update Next Block Data
+                            blockType += 1;
+                            if (blockType == 3) {
+                                blockType = 0;
+                                xPos += 8;
+                                if (xPos == Globals.MAX_WIDTH) {
+                                    xPos = 0;
+                                    yPos = (yPos + 8);
+                                }
+                            }
+                        }
+
+                    }
+                }
+            }
 
         }
 

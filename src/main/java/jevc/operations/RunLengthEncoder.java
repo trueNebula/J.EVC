@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 
 public class RunLengthEncoder {
+    private char frametype = 'I';
     private final int[] lastDCvalues = {0, 0, 0}; // [0] - last Y value; [1] - last Cb value; [2] - last Cr value
     public static final int[] ZIGZAG_ORDER = {
             0,  1,  8,  16,  9,  2,  3, 10,
@@ -19,6 +20,11 @@ public class RunLengthEncoder {
             58, 59, 52, 45, 38, 31, 39, 46,
             53, 60, 61, 54, 47, 55, 62, 63
     };
+    public RunLengthEncoder() {}
+
+    public RunLengthEncoder(char frametype) {
+        this.frametype = frametype;
+    }
 
     public RunLengthBlock encode(Block block) {
         int[][] blockdata = block.getData();
@@ -32,9 +38,14 @@ public class RunLengthEncoder {
 
         // encode the DC coefficient
         int amplitude = blockdata[0][0]-lastDCvalues[type];
-        lastDCvalues[type] = blockdata[0][0]; // save current DC value
+
+        if (frametype == 'I') {
+            amplitude -= lastDCvalues[type];
+            lastDCvalues[type] = blockdata[0][0]; // save current DC value
+        }
+
         int size = getSizeForAmplitude(amplitude);
-        if (amplitude==0) {
+        if (amplitude==0 && frametype=='I') {
             // IMPORTANT!!!: The size of a DC amplitude equal to ZERO is 0. But the size of a
             // AC amplitude equal to zero is actually 1! See pag.93-94 of the JPEG standard.
             // Of course, if the amplitude of the AC coefficient is 0, this AC coefficient
@@ -96,8 +107,13 @@ public class RunLengthEncoder {
             case 'V' -> 2;
             default -> -1;
         };
+
         data[0][0] = runLength.getAmplitude() + lastDCvalues[type];
-        lastDCvalues[type] = data[0][0];
+        if (frametype == 'I') {
+            data[0][0] += lastDCvalues[type];
+            lastDCvalues[type] = data[0][0]; // save current DC value
+        }
+
         rleBlock.getData().remove(0);
 
         int i = 1;
@@ -105,9 +121,15 @@ public class RunLengthEncoder {
             int run = rlb.getRunlength();
 //            System.out.println("RunLength ["+rlb.getRunlength()+","+rlb.getSize()+","+rlb.getAmplitude()+"] i="+i);
             while (run>0) {
+                if (i == 64) {
+                    i--;
+                }
                 data[ZIGZAG_ORDER[i]/8][ZIGZAG_ORDER[i]%8] = 0;
                 run--;
                 i++;
+            }
+            if (i == 64) {
+                i--;
             }
             data[ZIGZAG_ORDER[i]/8][ZIGZAG_ORDER[i]%8] = rlb.getAmplitude();
             i++;

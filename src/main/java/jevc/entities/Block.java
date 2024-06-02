@@ -61,6 +61,14 @@ public class Block {
 
     public int getPosY() { return posY; }
 
+    public void add(Block block) {
+        for (int i=0; i<BLOCKSIZE; i++) {
+            for (int j = 0; j < BLOCKSIZE; j++) {
+                data[i][j] += block.data[i][j];
+            }
+        }
+    }
+
     public void subtract(Block block) {
         for (int i=0; i<BLOCKSIZE; i++) {
             for (int j = 0; j < BLOCKSIZE; j++) {
