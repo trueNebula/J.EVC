@@ -7,4 +7,5 @@ public class Globals {
     public static int BITRATE = 7000;
     public static int FRAMECOUNT = 0;
     public static int SAMPLING = 0;
+    public static int GOP_SIZE = 10;
 }
