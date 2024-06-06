@@ -935,6 +935,9 @@ public class YCbCrImage {
     public int getSampling() {
         return sampling;
     }
+    public int getSize() {
+        return width*height;
+    }
     public void setSampling(int sampling) {
         if ((sampling!=YUV444Sampling) && (sampling!=YUV422HorizSampling) &&
                 (sampling!=YUV422VertSampling) && (sampling!=YUV411Sampling))

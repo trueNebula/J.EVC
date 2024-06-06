@@ -68,4 +68,8 @@ public class LapStopwatch {
         return this.stopwatch.elapsed(this.timeUnit);
     }
 
+    public boolean isRunning() {
+        return this.stopwatch.isRunning();
+    }
+
 }
