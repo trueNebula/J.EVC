@@ -1,10 +1,8 @@
 package jevc;
 
-import jevc.entities.Globals;
 import jevc.service.JVidDecoderService;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
 

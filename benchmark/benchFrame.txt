@@ -1,0 +1,11 @@
+frame001.png 63ms 6674ms 1ms 6738ms
+frame002.png 49ms 9822ms 0ms 9871ms
+frame005.png 58ms 14682ms 0ms 14740ms
+frame004.png 69ms 14952ms 0ms 15021ms
+frame003.png 62ms 15153ms 0ms 15215ms
+frame007.png 63ms 14675ms 0ms 14738ms
+frame006.png 60ms 14867ms 0ms 14927ms
+frame008.png 127ms 14700ms 0ms 14827ms
+frame009.png 63ms 14535ms 0ms 14598ms
+frame010.png 137ms 14351ms 0ms 14488ms
+total 22794ms

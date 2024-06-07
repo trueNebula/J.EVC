@@ -135,9 +135,9 @@ public class RunLengthEncoder {
             i++;
         }
         RunLength rlb = rleBlock.getData().get(rleBlock.getSize()-1);
-        if ((i<64) && ((rlb.getRunlength()!=0) || (rlb.getSize()!=0) || (rlb.getAmplitude()!=0))) {
+//        if ((i<64) && ((rlb.getRunlength()!=0) || (rlb.getSize()!=0) || (rlb.getAmplitude()!=0))) {
 //            System.err.println("RunLengthEncoder::decode() less than 64 coefficients and no End-Of-Block!");
-        }
+//        }
         while (i<64) {
             data[ZIGZAG_ORDER[i]/8][ZIGZAG_ORDER[i]%8] = 0;
             i++;

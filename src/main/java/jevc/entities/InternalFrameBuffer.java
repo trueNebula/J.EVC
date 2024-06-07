@@ -26,25 +26,18 @@ public class InternalFrameBuffer {
     public void dumpBufferToStreamWithoutFlushing(BufferedOutputStream outputStream) throws IOException {
         outputStream.write(this.buffer.toByteArray());
     }
-    public int dumpBufferToStream(BufferedOutputStream outputStream) throws IOException {
+    public void dumpBufferToStream(BufferedOutputStream outputStream) throws IOException {
         outputStream.write(this.buffer.toByteArray());
         int size = this.buffer.size();
         this.buffer.reset();
 
-        return size;
     }
 
-    public byte[] dumpStreamToBuffer() throws IOException {
+    public byte[] dumpStreamToBuffer() {
         return this.buffer.toByteArray();
     }
 
     public int size() {
         return this.buffer.size();
-    }
-
-    public void reset() throws IOException {
-        this.buffer.reset();
-        this.buffer.write(new byte[]{0, 0, 0, 0});
-        this.buffer.reset();
     }
 }

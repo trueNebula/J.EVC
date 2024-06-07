@@ -25,18 +25,11 @@ public class BlockBuffer {
         buffer.get(block.getType())[block.getPosY() / 8][block.getPosX() / 8] = block;
     }
 
-    // This might not be needed as we can just overwrite the buffers
-//    public void flush() {
-//        blockBufferY.clear();
-//        blockBufferU.clear();
-//        blockBufferV.clear();
-//    }
-
     public Block getSimilarBlock(Block block) {
         int y = block.getPosY();
         int x = block.getPosX();
 //        System.out.println("Current Block: [" + x + ", " + y + "]");
-        double[][] MSEValues = new double[searchRadius * 2 + 1][searchRadius * 2 + 1];
+//        double[][] MSEValues = new double[searchRadius * 2 + 1][searchRadius * 2 + 1];
 
         int top = y/8 - searchRadius;
         int bottom = y/8 + searchRadius;

@@ -176,7 +176,7 @@ public class JVidDecoderService {
             String codeword = "";
             int xPos = 0, yPos = 0, blockType = 0;
 
-            ByteStack stack = new ByteStack(data, chunkSize+1);
+            ByteStack stack = new ByteStack(data);
             huffmanEncoder.resetIndices();
 
             while (!stack.isEmpty()) {

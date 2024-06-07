@@ -2,7 +2,6 @@ package jevc.operations;
 
 import jevc.entities.Block;
 import jevc.entities.MotionVector;
-import jevc.entities.WORD;
 
 public class MotionEstimator {
     // TODO: this class might not be needed

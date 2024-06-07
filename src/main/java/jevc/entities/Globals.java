@@ -8,4 +8,7 @@ public class Globals {
     public static int FRAMECOUNT = 0;
     public static int SAMPLING = 0;
     public static int GOP_SIZE = 10;
+    public static int MAX_GOPS_AT_ONCE = 4;
+    public static int MAX_COMBO_GOPS_AT_ONCE = 2;
+    public static int MAX_COMBO_FRAMES_AT_ONCE = 2;
 }

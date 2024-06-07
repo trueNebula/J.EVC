@@ -24,9 +24,7 @@ public class Block {
     public Block getCopy() {
         int[][] newData = new int[BLOCKSIZE][BLOCKSIZE];
         for (int i=0; i<BLOCKSIZE; i++) {
-            for (int j = 0; j < BLOCKSIZE; j++) {
-                newData[i][j] = data[i][j];
-            }
+            System.arraycopy(data[i], 0, newData[i], 0, BLOCKSIZE);
         }
         return new Block(newData, type, posX, posY);
     }

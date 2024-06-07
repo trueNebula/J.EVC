@@ -97,17 +97,13 @@ public class JVidEncoderService {
         try {
             if (perFrame) {
                 compressPerFrame();
-            }
-            if (perGop) {
+            } else if (perGop) {
                 compressPerGop();
-            }
-            if (frameOperation) {
+            } else if (frameOperation) {
                 compressFrameOperation();
-            }
-            if (combination) {
+            } else if (combination) {
                 compressCombination();
-            }
-            if (!perFrame && !perGop && !frameOperation && !combination) {
+            } else {
                 compressSequentially();
             }
         } catch (Exception ex) {
@@ -482,11 +478,9 @@ public class JVidEncoderService {
         // Frame data is written to internalFrameBuffers
         // Block data is handled in the respective methods
 
-        int MAX_GOPS_AT_ONCE = 2;
-        int MAX_FRAMES_AT_ONCE = 2;
 
         ConcurrentHashMap<Integer, List<File>> gops = new ConcurrentHashMap<>();
-        ExecutorService gopService = Executors.newFixedThreadPool(MAX_GOPS_AT_ONCE);
+        ExecutorService gopService = Executors.newFixedThreadPool(Globals.MAX_COMBO_GOPS_AT_ONCE);
 
         // Get resolution from first frame
         YCbCrImage frame = readImage(this.files[0]);
@@ -498,7 +492,7 @@ public class JVidEncoderService {
 
         while (frameIndex < this.files.length) {
             // Split files into GOPs
-            for (int i = 0; i < MAX_GOPS_AT_ONCE; i++) {
+            for (int i = 0; i < Globals.MAX_COMBO_GOPS_AT_ONCE; i++) {
                 usedGops++;
                 if (!Objects.isNull(gops.get(i))) {
                     gops.get(i).clear();
@@ -646,139 +640,6 @@ public class JVidEncoderService {
 
         logger.updateProgressStatus(101, "Finished!", frameName);
 
-    }
-    private void processFrameJvid(YCbCrImage frame, char frameType, String frameName) throws IOException {
-        // DEBUG
-        BufferedOutputStream frameOutputStream = null;
-        InternalFrameBuffer frameOutputBuffer = null;
-        if (isDebug) {
-            frameOutputStream = new BufferedOutputStream(
-                    new FileOutputStream(outputFolder + frameName.replace(".png", ".jpg"))
-            );
-            frameOutputBuffer = new InternalFrameBuffer();
-        }
-
-        // init encoders
-        logger.updateProgressStatus(0, "Initializing Encoders...", frameName);
-        RunLengthEncoder runLengthEncoder = null;
-        if (frameType == 'I') {
-            runLengthEncoder = new RunLengthEncoder();
-        } else if (frameType == 'P') {
-            runLengthEncoder = new RunLengthEncoder('P');
-        }
-        HuffmanEncoder huffmanEncoder = new HuffmanEncoder();
-
-        BufferedOutputStream tempOutputStream = tempOutputStreams.get(0);
-
-        // scale and subsample image
-        logger.updateProgressStatus(2, "Subsampling Image...", frameName);
-        frame.ScaleImage();
-        //image.PerformSubsampling(YCbCrImage.YUV411Sampling);
-        frame.PerformSubsampling(YCbCrImage.YUV444Sampling);
-
-        // split frame into blocks
-        logger.updateProgressStatus(5, "Performing block splitting...", frameName);
-        ArrayList<Block> blocks = frame.PerformBlockSplitting();
-        RunLengthBlock rleBlock;
-        stopwatch.lap();
-
-        // process each block
-        logger.updateProgressStatus(10, "Processing blocks...", frameName);
-
-        // This is used to determine if we have to write a new codeword for the block
-        // pBlockCodeword = mvec => only motion vector is written
-        // pBlockCodeword = errb => motion vector and error block data is written
-        // only write the codeword once per change
-        String pBlockCodeword = "";
-        boolean codewordChanged;
-
-        int blockIndex = 0;
-        for (Block block: blocks) {
-            blockIndex++;
-            logger.updateProgressStatus((int) (((double) blockIndex / blocks.size() * 100 * 0.9)), "Processing blocks...", frameName);
-
-            // I frame => perform DCT, quantization, inverses, push to buffer, proceed to VLC
-            // P frame => search in block buffer, estimate motion, subtract, perform DCT, quantization,
-            //            proceed to VLC
-            if (frameType == 'P') {
-                motionEstimator = new MotionEstimator();
-
-                // look through block buffer for the most similar block
-                Block similarBlock = blockBuffer.getSimilarBlock(block);
-
-                // compute motion vector
-                MotionVector motionVector = motionEstimator.computeMotionVector(block, similarBlock);
-
-                // subtract found block from input block
-                block.subtract(similarBlock);
-
-                // if the error is 0, don't write it
-                if (!block.isEmpty()) {
-                    codewordChanged = !pBlockCodeword.equals("errb");
-                    pBlockCodeword = "errb";
-
-                    // perform DCT
-                    DCT.forward(block);
-
-                    // quantize DCT coefficients
-                    quantizer.quantize(block);
-                } else {
-                    codewordChanged = !pBlockCodeword.equals("mvec");
-                    pBlockCodeword = "mvec";
-                }
-
-                // write motion vector to buffer
-                if (codewordChanged) {
-                    // codeword changed, write it
-                    internalFrameBuffer.write(new DWORD(pBlockCodeword).byteValue());
-                }
-                internalFrameBuffer.write(motionVector.byteValue());
-            } else if (frameType == 'I'){
-                // save a copy in the block buffer
-                Block savedBlock = block.getCopy();
-
-                // perform DCT
-                DCT.forward(block);
-
-                // quantize DCT coefficients
-                quantizer.quantize(block);
-
-                // save it in a block buffer
-                blockBuffer.save(savedBlock);
-            }
-
-            if (frameType == 'I') {
-                // VLC encode block
-                rleBlock = runLengthEncoder.encode(block);
-                huffmanEncoder.encode(internalFrameBuffer, rleBlock);
-            } else if (frameType == 'P' && !block.isEmpty()) {
-                // VLC encode block
-                rleBlock = runLengthEncoder.encode(block);
-                huffmanEncoder.encode(internalFrameBuffer, rleBlock);
-                // EOB
-                internalFrameBuffer.write(new WORD((byte) 255, (byte) 255).byteValue());
-            }
-        }
-
-        stopwatch.lap();
-        logger.updateProgressStatus(90, "Finishing up...", frameName);
-
-        // flush buffers
-        huffmanEncoder.flushBuffer(internalFrameBuffer);
-
-        // debug
-        if (isDebug) {
-            internalFrameBuffer.dumpBufferToStreamWithoutFlushing(frameOutputStream);
-            jpgWriter.writeTrailerSection(frameOutputBuffer);
-            frameOutputBuffer.dumpBufferToStream(frameOutputStream);
-            frameOutputStream.flush();
-        }
-
-        jVidWriter.writeDataChunk(tempOutputStream, internalFrameBuffer, frameType);
-        tempOutputStream.flush();
-
-        logger.updateProgressStatus(100, "Finished!", frameName);
-        stopwatch.lap();
     }
     private void processIFrameJvid(YCbCrImage frame, String frameName) throws IOException {
         // DEBUG
@@ -1241,7 +1102,7 @@ public class JVidEncoderService {
         huffmanEncoder.flushBuffer(internalFrameBuffer);
 
         // debug
-        if (isDebug) {
+        if (isDebug && frameOutputStream != null) {
             internalFrameBuffer.dumpBufferToStreamWithoutFlushing(frameOutputStream);
             jpgWriter.writeTrailerSection(frameOutputBuffer);
             frameOutputBuffer.dumpBufferToStream(frameOutputStream);
@@ -1338,7 +1199,7 @@ public class JVidEncoderService {
         huffmanEncoder.flushBuffer(internalFrameBuffer);
 
         // debug
-        if (isDebug) {
+        if (isDebug && frameOutputStream != null) {
             internalFrameBuffer.dumpBufferToStreamWithoutFlushing(frameOutputStream);
             jpgWriter.writeTrailerSection(frameOutputBuffer);
             frameOutputBuffer.dumpBufferToStream(frameOutputStream);
@@ -1441,7 +1302,7 @@ public class JVidEncoderService {
         stopwatch.lapFrame(frameIndex + Globals.GOP_SIZE * gopIndex);
 
         // debug
-        if (isDebug) {
+        if (isDebug && frameOutputStream != null) {
             ifb.dumpBufferToStreamWithoutFlushing(frameOutputStream);
             jpgWriter.writeTrailerSection(frameOutputBuffer);
             frameOutputBuffer.dumpBufferToStream(frameOutputStream);
@@ -1464,7 +1325,7 @@ public class JVidEncoderService {
         stopwatch.stopFrame(Globals.GOP_SIZE * gopIndex);
         logger.benchmark(stopwatch, frameName, Globals.GOP_SIZE * gopIndex);
 
-        ExecutorService frameService = Executors.newFixedThreadPool(2);
+        ExecutorService frameService = Executors.newFixedThreadPool(Globals.MAX_COMBO_FRAMES_AT_ONCE);
 
         // Create a CountDownLatch for the number of P frames
         CountDownLatch latch = new CountDownLatch(gop.size() - 1);

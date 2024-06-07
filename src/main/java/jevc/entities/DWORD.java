@@ -4,8 +4,8 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
 public class DWORD {
-    private WORD high;
-    private WORD low;
+    private final WORD high;
+    private final WORD low;
 
     public DWORD (short high, short low) {
         this.low = new WORD(high);

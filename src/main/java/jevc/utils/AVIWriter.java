@@ -21,7 +21,7 @@ public class AVIWriter {
 
     private final int fps = 10;
     private final int bytesPerSec = 7000;
-    private ArrayList<Integer> frameLengthBuffer;
+    private final ArrayList<Integer> frameLengthBuffer;
 
     public AVIWriter() {
         riff = new RIFF(

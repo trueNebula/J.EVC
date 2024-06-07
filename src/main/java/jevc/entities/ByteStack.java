@@ -4,7 +4,7 @@ public class ByteStack {
     private final byte[] stack;
     private int top;
 
-    public ByteStack(byte[] data, int size) {
+    public ByteStack(byte[] data) {
         stack = data;
         top = 0;
     }

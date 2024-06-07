@@ -5,8 +5,6 @@ import jevc.entities.RunLength;
 import jevc.entities.RunLengthBlock;
 import jevc.entities.YCbCrImage;
 
-import java.io.BufferedOutputStream;
-import java.io.IOException;
 import java.util.ArrayList;
 
 /*
@@ -310,21 +308,21 @@ public class HuffmanEncoder {
         }
 
 //        System.out.print("        	A MCU contains the following blocks in this order: ");
-        for (int i=0; i<3; i++) {
-            char blocktype = switch (i) {
-                case 0 -> 'Y';
-                case 1 -> 'U';
-                case 2 -> 'V';
-                default -> ' ';
-            };
-//            for (int j=0; j<horizontalSamplingFactors[i]*verticalSamplingFactors[i]; j++) {
+//        for (int i=0; i<3; i++) {
+//            char blocktype = switch (i) {
+//                case 0 -> 'Y';
+//                case 1 -> 'U';
+//                case 2 -> 'V';
+//                default -> ' ';
+//            };
+////            for (int j=0; j<horizontalSamplingFactors[i]*verticalSamplingFactors[i]; j++) {
 //                System.out.print(blocktype + ", ");
 //            }
-        }
+//        }
 //        System.out.println();
     }
 
-    public void encode (InternalFrameBuffer outputStream, RunLengthBlock block) throws IOException {
+    public void encode (InternalFrameBuffer outputStream, RunLengthBlock block) {
         int[][] DCHuffmanTable;
         int[][] ACHuffmanTable;
 
@@ -391,7 +389,7 @@ public class HuffmanEncoder {
      * least 8 bits in this buffer, they are written in the `outputStream`. `bitcount`
      * holds the number of bits in the `prewriteBuffer`.
      */
-    private void writeToStream(InternalFrameBuffer outputStream, int codeword, int nbits) throws IOException {
+    private void writeToStream(InternalFrameBuffer outputStream, int codeword, int nbits) {
         codeword &= (1<<nbits) - 1; // zero out non important bits
         // In the `prewriteBuffer` the `bitcount` most-significant-bits are occupied.
         // We need to add `nbits` of `codeword` to this.
@@ -405,7 +403,7 @@ public class HuffmanEncoder {
 
     }
 
-    public void flushBuffer(InternalFrameBuffer outputStream) throws IOException {
+    public void flushBuffer(InternalFrameBuffer outputStream) {
         writeBuffer(outputStream);
         if (bitcount > 0) {
             int c = ((prewriteBuffer >> 24) & 0xff); // get the MSB (Most Significant Byte)
@@ -413,7 +411,7 @@ public class HuffmanEncoder {
         }
     }
 
-    private void writeBuffer(InternalFrameBuffer outputStream) throws IOException {
+    private void writeBuffer(InternalFrameBuffer outputStream) {
         while (bitcount >= 8) {
             int c = ((prewriteBuffer >> 24) & 0xff); // get the MSB (Most Significant Byte)
             outputStream.write(c);

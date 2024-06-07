@@ -1,9 +1,7 @@
 package jevc.entities;
 
-import java.nio.ByteBuffer;
-
 public class MotionVector {
-    private byte byteVal;
+    private final byte byteVal;
 
     public MotionVector(int x, int y) {
         // [x, y] are the values of the motion vector, represented by the delta of block positions

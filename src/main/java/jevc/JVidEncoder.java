@@ -11,10 +11,7 @@ import java.util.Objects;
 
 public class JVidEncoder {
     public static void main(String[] args) throws IOException {
-        if (args.length < 2) {
-            System.out.println("Run the program: java jevc.JVidEncoder folder fps");
-        }
-
+        // Flags
         String input = "";
         String output = "";
         int fps  = 30;
@@ -25,7 +22,7 @@ public class JVidEncoder {
         boolean isDebug = false;
         boolean isQuiet = false;
 
-        // Flags
+        // Set Flags
         for (int i = 0; i < args.length; i++) {
             if (args[i].charAt(0) == '-') {
                 switch (args[i].charAt(1)) {
@@ -112,18 +109,18 @@ public class JVidEncoder {
         System.out.println("  -o output: Output folder and file name");
         System.out.println("  -f fps: Framerate");
         System.out.println("  -p types: Use parallelization");
-        System.out.println("  Parallelization options: ");
+        System.out.println("  Parallelization options:");
         System.out.println("    f: Per-Frame");
         System.out.println("    g: Per-GOP");
         System.out.println("    o: Frame Operation");
-        System.out.println("  Usage example: -p fg (Per-Frame and Per-GOP)");
+        System.out.println("    c: Combination");
         System.out.println("  -m: Compress to MJPEG");
         System.out.println("  -b: Enable benchmarking");
         System.out.println("  -e export: Export benchmark");
         System.out.println("  -d: Create debug frames");
         System.out.println("  -q: Quiet mode");
         System.out.println("  -h: Help");
-        System.out.println("Example: jevc -i inputFolder -o outputFolder/output.jvd -f 30 -p fg -b -q");
+        System.out.println("Example: jevc -i inputFolder -o outputFolder/output.jvd -f 30 -p c -b -e ./benchmark.txt -q");
         System.exit(0);
     }
 

@@ -42,46 +42,6 @@ public class Logger {
         System.out.println(message);
     }
 
-    public void benchmarkSequential(LapStopwatch stopwatch, String frameName) throws IOException {
-        // Benchmarking disabled
-        if (!isPrinting && Objects.equals(exportLocation, "")) {
-            return;
-        }
-
-        // Stopwatch laps:
-        // lap 0: scaling, subsampling, block splitting
-        // lap 1: block processing
-        // lap 2: frame writing
-        List<Long> laps = stopwatch.getLaps();
-        List<String> times = List.of(
-                laps.get(0) + "ms" + " ",
-                (laps.get(1) - laps.get(0)) + "ms" + " ",
-                (laps.get(2) - laps.get(1)) + "ms" + " ",
-                laps.get(2) + "ms"
-        );
-        String table =
-                "Pre Split ---------- Block Processing ---------- Frame Writing ---------- Total\n" +
-                        String.format("%-10s %20s %25s %20s\n", times.get(0), times.get(1), times.get(2), times.get(3));
-
-        if (isPrinting) {
-            if (isQuiet) {
-                System.out.println("Frame: " + frameName);
-            }
-            System.out.print(table);
-        }
-
-        if (!Objects.equals(exportLocation, "")) {
-            // Export to file
-            stream.write((
-                    frameName + " " +
-                            times.get(0) +
-                            times.get(1) +
-                            times.get(2) +
-                            times.get(3) + "\n"
-            ).getBytes());
-        }
-    }
-
     public void benchmark(LapStopwatch stopwatch, String frameName, Integer frameIndex) throws IOException {
         // Benchmarking disabled
         if (!isPrinting && Objects.equals(exportLocation, "")) {

@@ -3,7 +3,7 @@ package jevc.entities;
 import java.util.ArrayList;
 
 public class ExponentialGolombBlock {
-    private ArrayList<Integer> data;
+    private final ArrayList<Integer> data;
 
     public ExponentialGolombBlock(ArrayList<Integer> data) {
         this.data = data;

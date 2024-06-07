@@ -3,8 +3,8 @@ package jevc.entities;
 import java.nio.ByteBuffer;
 
 public class WORD {
-    private byte high;
-    private byte low;
+    private final byte high;
+    private final byte low;
 
     public WORD (short value) {
         this.low = (byte) ((value >> 8) & 0xFF);

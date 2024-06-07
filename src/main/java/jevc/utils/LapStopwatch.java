@@ -45,10 +45,6 @@ public class LapStopwatch {
         this.lapsMap.clear();
     }
 
-    public void lap() {
-        this.laps.add(this.stopwatch.elapsed(this.timeUnit));
-    }
-
     public void lapFrame(Integer frameIndex) {
         if (!this.lapsMap.containsKey(frameIndex)) {
             this.lapsMap.put(frameIndex, new ArrayList<>());

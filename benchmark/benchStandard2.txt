@@ -1,0 +1,21 @@
+frame001.png 54ms 5875ms 4ms 5933ms
+frame002.png 51ms 3983ms 0ms 4034ms
+frame003.png 26ms 6197ms 1ms 6224ms
+frame004.png 42ms 6161ms 0ms 6203ms
+frame005.png 24ms 5963ms 1ms 5988ms
+frame006.png 24ms 6145ms 1ms 6170ms
+frame007.png 24ms 6003ms 0ms 6027ms
+frame008.png 24ms 6113ms 1ms 6138ms
+frame009.png 25ms 6196ms 1ms 6222ms
+frame010.png 23ms 6177ms 0ms 6200ms
+frame011.png 54ms 5875ms 4ms 5933ms
+frame012.png 51ms 3983ms 0ms 4034ms
+frame013.png 26ms 6197ms 1ms 6224ms
+frame014.png 42ms 6161ms 0ms 6203ms
+frame015.png 24ms 5963ms 1ms 5988ms
+frame016.png 24ms 6145ms 1ms 6170ms
+frame017.png 24ms 6003ms 0ms 6027ms
+frame018.png 24ms 6113ms 1ms 6138ms
+frame019.png 25ms 6196ms 1ms 6222ms
+frame020.png 23ms 6177ms 0ms 6200ms
+total 120735ms

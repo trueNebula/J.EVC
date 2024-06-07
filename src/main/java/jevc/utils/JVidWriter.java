@@ -5,15 +5,11 @@ import jevc.entities.Globals;
 import jevc.entities.InternalFrameBuffer;
 import jevc.entities.WORD;
 
-import jevc.utils.ByteConverter;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.ArrayList;
-import java.util.Arrays;
 
 public class JVidWriter {
     public final JVidHeader jVidHeader;
@@ -44,7 +40,7 @@ public class JVidWriter {
 
     public void writeJvidHeader(BufferedOutputStream outputStream, int frameCount, DWORD width, DWORD height) throws IOException {
         // fill in missing atoms
-        jVidHeader.dwSize = getJvidSize(frameCount);
+        jVidHeader.dwSize = getJvidSize();
         jVidStreamHeader.dwTotalFrames = new DWORD(frameCount);
         jVidStreamHeader.dwWidth = width;
         jVidStreamHeader.dwHeight = height;
@@ -133,7 +129,7 @@ public class JVidWriter {
         return new int[]{bitstreamSize, fps, frameCount, bitrate, width, height};
     }
 
-    private DWORD getJvidSize(int frameCount) {
+    private DWORD getJvidSize() {
         // Jvid Header should have the full stream size (file size - 8)
         // jvih size = 7 * 4 = 28 Bytes
         // sdat size = 3 * 4 + frame size = 12 + frame size Bytes
@@ -184,39 +180,5 @@ class StreamDataChunk {
         this.dwFourCc = dwFourCc;
         this.dwSize = dwSize;
         this.dwType = dwType;
-    }
-}
-
-class CompressedDataChunk extends StreamDataChunk{
-    public DWORD[] data;
-
-    public CompressedDataChunk(DWORD dwFourCc, DWORD dwSize, DWORD dwType, DWORD[] data) {
-        super(dwFourCc, dwSize, dwType);
-        this.data = data;
-    }
-}
-
-class MotionDataChunk extends StreamDataChunk {
-    public DWORD dwMvecCC;
-    public MotionVectorCOmponents MvecComponents;
-    public DWORD dwErrCC;
-    public DWORD[] errData;
-
-    public MotionDataChunk(DWORD dwFourCc, DWORD dwSize, DWORD dwType, DWORD dwMvecCC, MotionVectorCOmponents mvecComponents, DWORD dwErrCC, DWORD[] errData) {
-        super(dwFourCc, dwSize, dwType);
-        this.dwMvecCC = dwMvecCC;
-        MvecComponents = mvecComponents;
-        this.dwErrCC = dwErrCC;
-        this.errData = errData;
-    }
-}
-
-class MotionVectorCOmponents {
-    public WORD dwX;
-    public WORD dwY;
-
-    public MotionVectorCOmponents(WORD dwX, WORD dwY) {
-        this.dwX = dwX;
-        this.dwY = dwY;
     }
 }

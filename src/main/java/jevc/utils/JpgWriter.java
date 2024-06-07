@@ -6,7 +6,6 @@ import jevc.operations.HuffmanEncoder;
 import jevc.operations.Quantizer;
 import jevc.operations.RunLengthEncoder;
 
-import java.io.IOException;
 import java.util.Vector;
 
 public class JpgWriter {
@@ -39,7 +38,7 @@ public class JpgWriter {
         this.quantizer = quantizer;
     }
 
-    public void writeHeaderSections(InternalFrameBuffer internalFrameBuffer, YCbCrImage frame) throws IOException {
+    public void writeHeaderSections(InternalFrameBuffer internalFrameBuffer, YCbCrImage frame) {
         internalFrameBuffer.write(SOI);
         writeAPP0Segment(internalFrameBuffer);
         writeCOMSegment(internalFrameBuffer);
@@ -49,7 +48,7 @@ public class JpgWriter {
         writeSOSSegment(internalFrameBuffer);
     }
 
-    public int writeTrailerSection(InternalFrameBuffer internalFrameBuffer) {
+    public void writeTrailerSection(InternalFrameBuffer internalFrameBuffer) {
         int paddingBytesNeeded;
         switch ((internalFrameBuffer.size() + 2) % 4) {
             case 1 -> paddingBytesNeeded = 3;
@@ -63,7 +62,7 @@ public class JpgWriter {
         }
 
         internalFrameBuffer.write(EOI);
-        return internalFrameBuffer.size();
+        internalFrameBuffer.size();
     }
 
     /** write the JFIF segment (APP0 marker)
