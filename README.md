@@ -11,7 +11,7 @@ The codec requires Java 20.
 ```bash
 $ git clone
 $ cd J.EVC
-$ mvn clean compile assembly:single
+$ mvn clean package
 $ java jevc.JVidEncoder 
 ```
 
@@ -36,10 +36,15 @@ The codec is designed to be used from the command line. The following CLI flags 
 Example:
 
 ```bash
-jevc -i inputFolder -o outputFolder/out.jvd -f 30 -p c -b -e ./benchmark.txt -q
+$ ./target/jevc -i inputFolder -o outputFolder/out.jvd -f 30 -p c -b -e ./benchmark.txt -q
 ```
 
-The decoder requires ffmpeg to be installed. Due to it's unfinished nature, no documentation will be provided. Have fun :)
+The decoder requires ffmpeg to be installed. 
+```bash
+$ ./target/jevcDecoder inputFile
+```
+
+Due to it's unfinished nature, no documentation will be provided. Have fun :)
 
 ## License
 [GPL V3](https://choosealicense.com/licenses/gpl-3.0/)

@@ -2,8 +2,6 @@ import jevc.entities.*;
 import jevc.operations.HuffmanEncoder;
 import junit.framework.TestCase;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -12,7 +10,7 @@ import java.util.List;
 public class HuffmanEncoderTest extends TestCase {
     private HuffmanEncoder huffmanEncoder;
 
-    public void testEncodeBlock() throws IOException {
+    public void testEncodeBlock() {
         RunLengthBlock block = new RunLengthBlock();
         block.setType('Y');
         // [-1, 0, 0] [0, 1, 1] [0, 2, -2] [0, 3, -4] [0, 2, -2] [1, 1, -1] [0, 1, 1] [0, 1, 1] [0, 1, 1] [1, 1, 1] [1, 1, -1] [4, 1, -1] [0, 0, 0]
@@ -40,8 +38,13 @@ public class HuffmanEncoderTest extends TestCase {
         byte[] encodedData = outputBuffer.dumpStreamToBuffer();
         System.out.println("Encoded data: " + Arrays.toString(encodedData));
 
-        ByteBuffer dataBuffer = ByteBuffer.allocate(1);
-        dataBuffer.put((byte) -32);
+        ByteBuffer dataBuffer = ByteBuffer.allocate(6);
+        dataBuffer.put((byte) 10);
+        dataBuffer.put((byte) -58);
+        dataBuffer.put((byte) -72);
+        dataBuffer.put((byte) 36);
+        dataBuffer.put((byte) -25);
+        dataBuffer.put((byte) 29);
         byte[] assumedResult = dataBuffer.array();
         assertEquals(assumedResult.length, encodedData.length);
         for (int i = 0; i < assumedResult.length; i++) {

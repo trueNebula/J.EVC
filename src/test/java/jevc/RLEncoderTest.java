@@ -12,7 +12,7 @@ public class RLEncoderTest extends TestCase {
     public void testEncode() {
         runLengthEncoder = new RunLengthEncoder('P');
         int[][] data1 = new int[][] {
-                {-64, 0, 0, 0, 0, 0, 0, 0},
+                {-63, 0, 0, 0, 0, 0, 0, 0},
                 {0, 0, 0, 0, 0, 0, 0, 0,},
                 {0, 0, 0, 0, 0, 0, 0, 0,},
                 {0, 0, 0, 0, 0, 0, 0, 0,},
@@ -46,7 +46,7 @@ public class RLEncoderTest extends TestCase {
         assertEquals(0, encodedData1.getData().get(1).getRunlength());
 
         RunLengthBlock assumedResult = new RunLengthBlock();
-        RunLength rl0 = new RunLength(-1, 4, 13);
+        RunLength rl0 = new RunLength(-1, 6, -50);
         RunLength rl1 = new RunLength(0, 1, 1);
         RunLength rl2 = new RunLength(0, 2, -2);
         RunLength rl3 = new RunLength(0, 3, -4);
