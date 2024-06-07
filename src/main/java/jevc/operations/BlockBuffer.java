@@ -83,9 +83,6 @@ public class BlockBuffer {
             case 1 -> blockType = 'U';
             case 2 -> blockType = 'V';
         }
-        if (y == 1088) {
-            System.out.println("woops");
-        }
         return buffer.get(blockType)[y / 8][x / 8];
     }
 

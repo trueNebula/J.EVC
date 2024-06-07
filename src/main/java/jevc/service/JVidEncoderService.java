@@ -35,8 +35,8 @@ public class JVidEncoderService {
 
     // Multithreading
     private final ExecutorService executorService;
-    private ConcurrentHashMap<Integer, InternalFrameBuffer> internalFrameBuffers;
-    private ConcurrentHashMap<Integer, BufferedOutputStream> tempOutputStreams;
+    private final ConcurrentHashMap<Integer, InternalFrameBuffer> internalFrameBuffers;
+    private final ConcurrentHashMap<Integer, BufferedOutputStream> tempOutputStreams;
 
     // Flags
     private final boolean compressToMjpeg;
@@ -93,7 +93,7 @@ public class JVidEncoderService {
         this.tempOutputStreams = new ConcurrentHashMap<>();
     }
 
-    public void compress() throws IOException {
+    public void compress() {
         try {
             if (perFrame) {
                 compressPerFrame();
@@ -102,7 +102,7 @@ public class JVidEncoderService {
                 compressPerGop();
             }
             if (frameOperation) {
-//            compressFrameOperation();
+                compressFrameOperation();
             }
             if (combination) {
 //            compressCombination();
@@ -150,7 +150,7 @@ public class JVidEncoderService {
             if (this.compressToMjpeg) {
                 processFrameMjpeg(frame, frameName, 0);
             } else {
-                processIFrameJvid(frame, frameName, 0);
+                processIFrameJvid(frame, frameName);
             }
             logger.benchmark(stopwatch, frameName, 0);
 
@@ -230,7 +230,7 @@ public class JVidEncoderService {
             if (this.compressToMjpeg) {
                 processFrameMjpeg(frame, frameName, 0);
             } else {
-                processIFrameJvid(frame, frameName, 0);
+                processIFrameJvid(frame, frameName);
             }
             stopwatch.stopFrame(0);
             logger.benchmark(stopwatch, frameName, 0);
@@ -308,11 +308,6 @@ public class JVidEncoderService {
         // Maybe loading every gop into memory will create a leak
         // Oh well
 
-//        int gopCount = this.files.length / Globals.GOP_SIZE;
-//        if (this.files.length % Globals.GOP_SIZE != 0) {
-//            gopCount++;
-//        }
-
         int MAX_GOPS_AT_ONCE = 4;
         int usedGops = 0;
 
@@ -386,6 +381,86 @@ public class JVidEncoderService {
 
         logger.log("Output file: " + outputFile);
 
+    }
+    public void compressFrameOperation() throws IOException {
+        logger.log("Starting encoding");
+        stopwatch.reset();
+
+        List<File> gop = new ArrayList<>();
+        DWORD videoWidth = new DWORD(0);
+        DWORD videoHeight = new DWORD(0);
+        YCbCrImage frame;
+        String frameName;
+
+        int frameIndex = 0;
+
+        while (frameIndex < this.files.length) {
+            // Read GOP
+            gop.clear();
+
+            for (int i = 0; i < Globals.GOP_SIZE; i++) {
+                gop.add(this.files[frameIndex]);
+                frameIndex++;
+            }
+
+            // Process I frame
+            frame = readImage(gop.get(0));
+            videoWidth = new DWORD(frame.getWidth());
+            videoHeight = new DWORD(frame.getHeight() + 8);
+            frameName = gop.get(0).getName();
+
+            if (!stopwatch.isRunning()) {
+                stopwatch.start();
+            }
+            stopwatch.startFrame(0);
+
+            if (this.compressToMjpeg) {
+                processFrameMjpeg(frame, frameName, 0);
+            } else {
+                prallelProcessIFrameOperations(frame, frameName);
+            }
+            logger.benchmark(stopwatch, frameName, 0);
+
+            // Process P frames
+            for (int i = 1; i < Globals.GOP_SIZE; i++) {
+                frame = readImage(gop.get(i));
+                frameName = gop.get(i).getName();
+                stopwatch.startFrame(i);
+                if (this.compressToMjpeg) {
+                    processFrameMjpeg(frame, gop.get(i).getName(), 0);
+                } else {
+                    parallelProcessPFrameOperations(i, frame, frameName);
+                }
+                stopwatch.stopFrame(i);
+                logger.benchmark(stopwatch, frameName, i);
+            }
+        }
+
+        while (!executorService.isTerminated()) {
+            executorService.shutdown();
+        }
+
+        stopwatch.stop();
+        logger.benchmark(stopwatch);
+        logger.log("Writing file header");
+
+        if (this.compressToMjpeg) {
+            aviWriter.writeAVIHeader(outputStream, this.files.length, videoWidth, videoHeight);
+        } else {
+            jVidWriter.writeJvidHeader(outputStream, this.files.length, videoWidth, videoHeight);
+        }
+
+        logger.log("File header written, writing frames");
+        File temp = new File(outputFolder + "temp/temp");
+        Files.copy(temp.toPath(), outputStream);
+        outputStream.flush();
+
+        if (this.compressToMjpeg) {
+            logger.log("Frames written, writing Idx1");
+            aviWriter.writeIdx1(outputStream, this.files.length);
+        }
+
+        logger.log("Output file: " + outputFile);
     }
 
     private void processFrameMjpeg(YCbCrImage frame, String frameName, Integer gopIndex) throws IOException {
@@ -596,7 +671,7 @@ public class JVidEncoderService {
         logger.updateProgressStatus(100, "Finished!", frameName);
         stopwatch.lap();
     }
-    private void processIFrameJvid(YCbCrImage frame, String frameName, Integer gopIndex) throws IOException {
+    private void processIFrameJvid(YCbCrImage frame, String frameName) throws IOException {
         // DEBUG
         BufferedOutputStream frameOutputStream = null;
         InternalFrameBuffer frameOutputBuffer = null;
@@ -663,7 +738,6 @@ public class JVidEncoderService {
         }
 
         logger.updateProgressStatus(100, "Finished!", frameName);
-        System.out.println(gopIndex + " " + internalFrameBuffer.size());
         jVidWriter.writeDataChunk(tempOutputStream, internalFrameBuffer, 'I');
         tempOutputStream.flush();
         stopwatch.lapFrame(0);
@@ -993,6 +1067,188 @@ public class JVidEncoderService {
 
         System.out.println("Finished processing GOP " + gopIndex);
     }
+    private void prallelProcessIFrameOperations(YCbCrImage frame, String frameName) throws IOException {
+        // DEBUG
+        BufferedOutputStream frameOutputStream = null;
+        InternalFrameBuffer frameOutputBuffer = null;
+        if (isDebug) {
+            frameOutputStream = new BufferedOutputStream(
+                    new FileOutputStream(outputFolder + frameName.replace(".png", ".jpg"))
+            );
+            frameOutputBuffer = new InternalFrameBuffer();
+        }
+
+        // init encoders
+        logger.updateProgressStatus(0, "Initializing Encoders...", frameName);
+        RunLengthEncoder runLengthEncoder = new RunLengthEncoder();
+        HuffmanEncoder huffmanEncoder = new HuffmanEncoder();
+
+        // scale and subsample image
+        logger.updateProgressStatus(2, "Subsampling Image...", frameName);
+        frame.ScaleImage();
+        frame.PerformSubsampling(YCbCrImage.YUV444Sampling);
+
+        // split frame into blocks
+        logger.updateProgressStatus(5, "Performing block splitting...", frameName);
+        ArrayList<Block> blocks = frame.PerformBlockSplitting();
+        RunLengthBlock rleBlock;
+        stopwatch.lapFrame(0);
+
+        // process each block
+        logger.updateProgressStatus(10, "Processing blocks...", frameName);
+
+        // Create a CountDownLatch for the number of blocks
+        CountDownLatch latch = new CountDownLatch(blocks.size());
+        ConcurrentHashMap<Integer, Block> blockMap = new ConcurrentHashMap<>();
+
+        int blockIndex = 0;
+        for (Block block: blocks) {
+//            logger.updateProgressStatus((int) (((double) blockIndex / blocks.size() * 100 * 0.9)), "Processing blocks...", frameName);
+
+            // I frame => perform DCT, quantization, inverses, push to buffer, proceed to VLC
+
+            // save a copy in the block buffer
+            Block savedBlock = block.getCopy();
+            blockBuffer.save(savedBlock);
+
+            executorService.execute(runnableProcessBlockOps(blockIndex, block, blockMap, latch));
+            blockIndex++;
+        }
+
+        try {
+            latch.await();
+        } catch (InterruptedException ex) {
+            logger.error("Error waiting for threads to finish!");
+            Thread.currentThread().interrupt();
+        }
+
+        for (int i = 0; i < blockMap.size(); i++) {
+            // VLC encode block
+            rleBlock = runLengthEncoder.encode(blockMap.get(i));
+            huffmanEncoder.encode(internalFrameBuffer, rleBlock);
+        }
+
+        stopwatch.lapFrame(0);
+        logger.updateProgressStatus(90, "Finishing up...", frameName);
+
+        // flush buffers
+        huffmanEncoder.flushBuffer(internalFrameBuffer);
+
+        // debug
+        if (isDebug) {
+            internalFrameBuffer.dumpBufferToStreamWithoutFlushing(frameOutputStream);
+            jpgWriter.writeTrailerSection(frameOutputBuffer);
+            frameOutputBuffer.dumpBufferToStream(frameOutputStream);
+            frameOutputStream.flush();
+        }
+
+        logger.updateProgressStatus(100, "Finished!", frameName);
+        jVidWriter.writeDataChunk(tempOutputStream, internalFrameBuffer, 'I');
+        tempOutputStream.flush();
+        stopwatch.lapFrame(0);
+    }
+    private void parallelProcessPFrameOperations(int frameIndex, YCbCrImage frame, String frameName) throws IOException {
+        // DEBUG
+        BufferedOutputStream frameOutputStream = null;
+        InternalFrameBuffer frameOutputBuffer = null;
+        if (isDebug) {
+            frameOutputStream = new BufferedOutputStream(
+                    new FileOutputStream(outputFolder + frameName.replace(".png", ".jpg"))
+            );
+            frameOutputBuffer = new InternalFrameBuffer();
+        }
+
+        // init encoders
+        logger.updateProgressStatus(0, "Initializing Encoders...", frameName);
+        RunLengthEncoder runLengthEncoder = new RunLengthEncoder('P');
+        HuffmanEncoder huffmanEncoder = new HuffmanEncoder();
+
+        // scale and subsample image
+        logger.updateProgressStatus(2, "Subsampling Image...", frameName);
+        frame.ScaleImage();
+        frame.PerformSubsampling(YCbCrImage.YUV444Sampling);
+
+        // split frame into blocks
+        logger.updateProgressStatus(5, "Performing block splitting...", frameName);
+        ArrayList<Block> blocks = frame.PerformBlockSplitting();
+        RunLengthBlock rleBlock;
+        stopwatch.lapFrame(frameIndex);
+
+        // process each block
+        logger.updateProgressStatus(10, "Processing blocks...", frameName);
+
+        // This is used to determine if we have to write a new codeword for the block
+        // pBlockCodeword = mvec => only motion vector is written
+        // pBlockCodeword = errb => motion vector and error block data is written
+        // only write the codeword once per change
+        String pBlockCodeword = "";
+        boolean codewordChanged;
+
+        // Create a CountDownLatch for the number of blocks
+        CountDownLatch latch = new CountDownLatch(blocks.size());
+        ConcurrentHashMap<Integer,FrameOpDataObject> frameOpData = new ConcurrentHashMap<>();
+
+        int blockIndex = 0;
+        for (Block block: blocks) {
+//            logger.updateProgressStatus((int) (((double) blockIndex / blocks.size() * 100 * 0.9)), "Processing blocks...", frameName);
+
+            executorService.execute(runnableProcessMotionOps(blockIndex, block, frameOpData, latch));
+            blockIndex++;
+        }
+
+        try {
+            if (latch.getCount() == 10) {
+                System.out.println("hjere");
+            }
+            latch.await();
+        } catch (InterruptedException ex) {
+            logger.error("Error waiting for threads to finish!");
+            Thread.currentThread().interrupt();
+        }
+
+        // Retrieve computed frame data and write it to buffer
+        for (int i = 0; i < frameOpData.size(); i++) {
+            codewordChanged = !pBlockCodeword.equals(frameOpData.get(i).getCodeword());
+            MotionVector motionVector = frameOpData.get(i).getMotionVector();
+            Block block  = frameOpData.get(i).getError();
+            pBlockCodeword = frameOpData.get(i).getCodeword();
+
+            if (codewordChanged) {
+                // Codeword changed, write it
+                internalFrameBuffer.write(new DWORD(pBlockCodeword).byteValue());
+            }
+            internalFrameBuffer.write(motionVector.byteValue());
+
+            if (!block.isEmpty()) {
+                // VLC encode block
+                rleBlock = runLengthEncoder.encode(block);
+                huffmanEncoder.encode(internalFrameBuffer, rleBlock);
+                // EOB
+                internalFrameBuffer.write(new WORD((byte) 255, (byte) 255).byteValue());
+            }
+        }
+
+
+        stopwatch.lapFrame(frameIndex);
+        logger.updateProgressStatus(90, "Finishing up...", frameName);
+
+        // flush buffers
+        huffmanEncoder.flushBuffer(internalFrameBuffer);
+
+        // debug
+        if (isDebug) {
+            internalFrameBuffer.dumpBufferToStreamWithoutFlushing(frameOutputStream);
+            jpgWriter.writeTrailerSection(frameOutputBuffer);
+            frameOutputBuffer.dumpBufferToStream(frameOutputStream);
+            frameOutputStream.flush();
+        }
+
+        jVidWriter.writeDataChunk(tempOutputStream, internalFrameBuffer, 'P');
+        tempOutputStream.flush();
+
+        logger.updateProgressStatus(100, "Finished!", frameName);
+        stopwatch.lapFrame(frameIndex);
+    }
 
     private Runnable runnableProcessFrameMjpeg(YCbCrImage frame, String frameName) {
         return () -> {
@@ -1026,6 +1282,59 @@ public class JVidEncoderService {
           }
         };
     }
+    private Runnable runnableProcessBlockOps(int blockIndex, Block block, ConcurrentHashMap<Integer, Block> blockMap, CountDownLatch latch) {
+        return () -> {
+            try {
+                // perform DCT
+                DCT.forward(block);
+
+                // quantize DCT coefficients
+                quantizer.quantize(block);
+
+                blockMap.put(blockIndex, block);
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                latch.countDown();
+            }
+        };
+    }
+    private Runnable runnableProcessMotionOps(int blockIndex, Block block, ConcurrentHashMap<Integer,FrameOpDataObject> frameOpData, CountDownLatch latch) {
+        return () -> {
+            try {
+                // P frame => search in block buffer, estimate motion, subtract, perform DCT, quantization,
+                //            proceed to VLC
+                motionEstimator = new MotionEstimator();
+                String pBlockCodeword;
+                // look through block buffer for the most similar block
+                Block similarBlock = blockBuffer.getSimilarBlock(block);
+
+                // compute motion vector
+                MotionVector motionVector = motionEstimator.computeMotionVector(block, similarBlock);
+
+                // subtract found block from input block
+                block.subtract(similarBlock);
+
+                // if the error is 0, don't write it
+                if (!block.isEmpty()) {
+                    pBlockCodeword = "errb";
+
+                    // perform DCT
+                    DCT.forward(block);
+
+                    // quantize DCT coefficients
+                    quantizer.quantize(block);
+                } else {
+                    pBlockCodeword = "mvec";
+                }
+                frameOpData.put(blockIndex, new FrameOpDataObject(motionVector, block, pBlockCodeword));
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                latch.countDown();
+            }
+        };
+    }
 
     private static String getOutputFile(String filePath) {
         String[] parts = filePath.split("[/\\\\]");
@@ -1035,7 +1344,6 @@ public class JVidEncoderService {
         }
         return parts[parts.length - 1];
     }
-
     private static String getOutputFolder(String filePath) {
         String[] parts = filePath.split("[/\\\\]");
         if (parts.length < 2) {
@@ -1044,7 +1352,6 @@ public class JVidEncoderService {
         }
         return filePath.substring(0, filePath.length() - parts[parts.length - 1].length());
     }
-
     private YCbCrImage readImage(File file) throws IOException {
         BufferedImage img = ImageIO.read(file);
 
