@@ -104,7 +104,7 @@ public class Logger {
                         String.format("%-10s %20s %25s %20s\n", times.get(0), times.get(1), times.get(2), times.get(3));
 
         if (isPrinting) {
-            if (isQuiet) {
+            if (isQuiet || isParallel) {
                 System.out.println("Frame: " + frameName);
             }
             System.out.print(table);
